@@ -4,6 +4,22 @@ module Lita
   module Handlers
     class Versioner < Handler
       http.post "/github_handler", :github_handler
+      route(/^build\s+(.+)/, :build, command: true, help: {
+        "build PIPELINE <TAG>" => "Kicks off a build for PIPELINE with TAG. TAG default: master"
+      })
+
+      def build(response)
+        params = response.args
+        unless params.length == 1 || params.length == 2
+          log "Argument issue. You can run this command like 'build PIPELINE <TAG>'"
+          return
+        end
+
+        pipeline_name = params.shift
+        build_tag = params.shift || "master"
+        log "I will kick off a build for #{pipeline_name} with #{build_tag}."
+        response.reply "Done!"
+      end
 
       def github_handler(request, response)
         payload = JSON.parse(request.params["payload"])
