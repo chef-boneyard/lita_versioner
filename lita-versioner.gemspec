@@ -2,11 +2,11 @@ Gem::Specification.new do |spec|
   spec.name          = "lita-versioner"
   spec.version       = "0.1.0"
   spec.authors       = ["Serdar Sutay"]
-  spec.email         = ["serdar@opscode.com"]
-  spec.description   = "TODO: Add a description"
-  spec.summary       = "TODO: Add a summary"
-  spec.homepage      = "TODO: Add a homepage"
-  spec.license       = "TODO: Add a license"
+  spec.email         = ["serdar@chef.io"]
+  spec.description   = "Lita plugin to drive Jenkins per Github pull requests."
+  spec.summary       = "Lita plugin to drive Jenkins per Github pull requests."
+  spec.homepage      = "https://github.com/chef/lita-versioner"
+  spec.license       = "Apache-2.0"
   spec.metadata      = { "lita_plugin_type" => "handler" }
 
   spec.files         = `git ls-files`.split($/)
