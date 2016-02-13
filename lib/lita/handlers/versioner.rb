@@ -1,4 +1,4 @@
-require 'json'
+require "json"
 
 module Lita
   module Handlers
@@ -59,11 +59,10 @@ module Lita
         true
       end
 
-
       def github_handler(request, response)
         payload = JSON.parse(request.params["payload"])
 
-        event_type = request.env['HTTP_X_GITHUB_EVENT']
+        event_type = request.env["HTTP_X_GITHUB_EVENT"]
         log "Processing '#{event_type}' event for '#{payload["repository"]["name"]}'."
 
         case event_type
