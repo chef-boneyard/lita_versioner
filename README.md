@@ -2,32 +2,48 @@
 
 [![Build Status](https://travis-ci.org/sersut/lita-versioner.png?branch=master)](https://travis-ci.org/sersut/lita-versioner)
 
-TODO: Add a description of the plugin.
-
-## Installation
-
-Add lita-versioner to your Lita instance's Gemfile:
-
-``` ruby
-gem "lita-versioner"
-```
+This plugin acts as a bridge between Github & Jenkins. When a pull request is merged in Github, `lita-versioner` automatically increases the version of the projects and triggers a Jenkins job.
 
 ## Configuration
 
-TODO: Describe any configuration attributes the plugin exposes.
+| Parameter | Description |
+|-----------|-------------|
+| `jenkins_username` | Username for the Jenkins account to use when triggering jobs. |
+| `jenkins_api_token` | Api token for the Jenkins account to use when triggering jobs. |
 
 ## Usage
 
-TODO: Describe the plugin's features and how to use them.
+Update the `PROJECTS` defined in `Lita::Handlers::Versioner` with the required information. E.g:
+
+```
+harmony: {
+  pipeline: "harmony-trigger-ad_hoc",
+  repository: "opscode-harmony"
+},
+# project_name: {
+#   pipeline: "name of the Jenkins job to trigger",
+#   repository: "name of the Github repo to monitor"
+# }
+```
+
+Configure a webhook for your Github repository following the instructions [here](https://developer.github.com/guides/delivering-deployments/).
 
 ## Development
 
-### Github Connection
+Lita has great documentation. Read [this](http://docs.lita.io/plugin-authoring/) first before starting. It will make below instructions easy to understand.
 
-1. Install lita [development environment](http://docs.lita.io/getting-started/installation/#development-environment).
-2. Install [ngrok](https://ngrok.com/download).
-3. Launch ngrok inside the lita dev VM.
-  * `./ngrok http 8080`
-4. Add a webhook to your github repo per instructions [here](https://developer.github.com/guides/delivering-deployments/).
-  * You can find the url you are looking for at https://dashboard.ngrok.com/status.
-5. `bundle exec lita` from your lita dev VM.
+1. Install and start [lita development environment](http://docs.lita.io/getting-started/installation/#development-environment).
+2. Inside the lita development environment:
+  1. Install [ngrok](https://ngrok.com/download).
+  2. Launch ngrok inside the lita dev VM.
+    * `./ngrok http 8080`
+3. Add a webhook to your github repo per instructions [here](https://developer.github.com/guides/delivering-deployments/).
+  * You can find the ngrok url to use at [ngrok dashboard](https://dashboard.ngrok.com/status).
+4. Run lita within the lita development environment:
+  * `bundle exec lita` from your lita dev VM.
+
+## Questions
+
+You can ask your questions in `#engineering-services` or ping `@serdar` on Slack.
+
+`Powered by Chef Engineering Services.`
