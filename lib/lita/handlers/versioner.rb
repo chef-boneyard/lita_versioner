@@ -8,7 +8,7 @@ module Lita
       config :jenkins_api_token, required: true
 
       http.post "/github_handler", :github_handler
-      route(/^build\s+(.+)/, :build, command: true, help: {
+      route(/^build/, :build, command: true, help: {
         "build PIPELINE <TAG>" => "Kicks off a build for PIPELINE with TAG. TAG default: master"
       })
 
@@ -79,7 +79,6 @@ module Lita
         end
       end
 
-      private
       def trigger_build(pipeline, tag)
         log "Kicking off a build for #{pipeline} with #{tag}."
 
