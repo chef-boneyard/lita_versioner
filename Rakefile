@@ -3,7 +3,7 @@ require "rspec/core/rake_task"
 
 RSpec::Core::RakeTask.new(:spec)
 
-task default: :spec
+task default: :test
 
 begin
   require "chefstyle"
@@ -14,3 +14,5 @@ begin
 rescue LoadError
   puts "chefstyle/rubocop is not available.  gem install chefstyle to do style checking."
 end
+
+task test: [:style, :spec]

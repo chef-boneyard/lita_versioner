@@ -6,5 +6,6 @@ require "lita/rspec"
 Lita.version_3_compatibility_mode = false
 
 RSpec.configure do |config|
-  config.filter_run :focus => true
+  config.filter_run focus: true
+  config.run_all_when_everything_filtered = true
 end
