@@ -90,8 +90,8 @@ module Lita
         begin
           # Raise if response is not 2XX
           status.value
-        rescue
-          log "Sorry, there was an error when kicking off the build!"
+        rescue Net::HTTPServerException => e
+          log "Sorry, received HTTP error #{e.response.code} when kicking off the build!"
           log status.body
           return
         end
