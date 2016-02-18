@@ -45,14 +45,18 @@ module Lita
         payload = JSON.parse(request.params["payload"])
 
         event_type = request.env["HTTP_X_GITHUB_EVENT"]
+        require 'pry'; binding.pry
         repository = payload["repository"]["name"]
         log "Processing '#{event_type}' event for '#{repository}'."
 
+        # TODO make a struct that holds these objects, make PROJECTS just an array
         target_pipeline = nil
+        target_project = nil
         PROJECTS.each do |project, project_data|
           if project_data[:repository] == repository
             log "Found matching project '#{project}'"
             target_pipeline = project_data[:pipeline]
+            target_project = project
             break
           end
         end
@@ -76,6 +80,24 @@ module Lita
           end
         else
           log "Skipping..."
+        end
+      end
+
+      def clone_or_refresh(project, repository)
+        wd = "/tmp/lita_versioner"
+        Dir.mkdir_p wd
+        if Dir.exists?(File.join(wd, repository))
+          # git reset
+          shellout = Mixlib::ShellOut.new("git reset --hard origin/master && git clean -fdx", cwd: File.join(wd, repository), timeout: 3600)
+        else
+          # git clone
+          shellout = Mixlib::ShellOut.new("git clone #{repository} #{project}", cwd: wd, timeout: 3600)
+        end
+        shellout.run
+        if shellout.error?
+          log "Error running git command #{shellout.command}"
+          log shellout.error
+          return
         end
       end
 
