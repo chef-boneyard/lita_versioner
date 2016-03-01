@@ -9,11 +9,30 @@ module Lita
     CACHE_DIRECTORY = "./cache"
 
     attr_reader :github_url
+    attr_reader :version_bump_command
 
-    def initialize(github_url)
+    def initialize(github_url, version_bump_command = nil)
       @github_url = github_url
+      @version_bump_command = version_bump_command
 
       Dir.mkdir(CACHE_DIRECTORY) unless File.exist? CACHE_DIRECTORY
+    end
+
+    def bump_version
+      return if version_bump_command.nil?
+
+      Bundler.with_clean_env do
+        run_command(version_bump_command)
+      end
+
+      if !run_command("git config -l").stdout.match /lita-versioner@chef.io/
+        run_command("git config user.email \"lita-versioner@chef.io\"")
+        run_command("git config user.name \"Lita Versioner\"")
+      end
+
+      run_command("git add -A")
+      run_command("git commit -m \"Automatic version bump for #{repo_name} by lita-versioner.\"")
+      run_command("git push origin master")
     end
 
     # Clones the repo into cache or refreshes the repo in cache.
@@ -39,6 +58,8 @@ module Lita
         "stdout: #{shellout.stdout}",
         "stderr: #{shellout.stderr}"
       ].join("\n") if shellout.error?
+
+      shellout
     end
 
     def repo_directory
