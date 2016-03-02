@@ -37,10 +37,19 @@ Lita has great documentation. Read [this](http://docs.lita.io/plugin-authoring/)
   1. Install [ngrok](https://ngrok.com/download).
   2. Launch ngrok inside the lita dev VM.
     * `./ngrok http 8080`
+  3. Follow instructions [here](https://dashboard.ngrok.com/get-started) to setup ngrok.
 3. Add a webhook to your github repo per instructions [here](https://developer.github.com/guides/delivering-deployments/).
   * You can find the ngrok url to use at [ngrok dashboard](https://dashboard.ngrok.com/status).
-4. Run lita within the lita development environment:
+4. Copy the github key you would like to use into `/home/lita/.ssh/github` with mod `0600`.
+5. Create `/home/lita/.ssh/config` to use the correct key when talking to Github:
+  ```
+  Host github.com
+  IdentityFile /home/lita/.ssh/github
+  StrictHostKeyChecking no
+  ```
+6. Run lita within the lita development environment:
   * `bundle exec lita` from your lita dev VM.
+
 
 ## Questions
 

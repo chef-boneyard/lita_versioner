@@ -11,9 +11,9 @@ module Lita
     attr_reader :github_url
     attr_reader :version_bump_command
 
-    def initialize(github_url, version_bump_command = nil)
-      @github_url = github_url
-      @version_bump_command = version_bump_command
+    def initialize(project)
+      @github_url = project[:github_url]
+      @version_bump_command = project[:version_bump_command]
 
       Dir.mkdir(CACHE_DIRECTORY) unless File.exist? CACHE_DIRECTORY
     end
@@ -24,10 +24,12 @@ module Lita
       Bundler.with_clean_env do
         run_command(version_bump_command)
       end
+    end
 
-      if !run_command("git config -l").stdout.match /lita-versioner@chef.io/
-        run_command("git config user.email \"lita-versioner@chef.io\"")
-        run_command("git config user.name \"Lita Versioner\"")
+    def tag_and_commit
+      if !run_command("git config -l").stdout.match /chef-versioner@chef.io/
+        run_command("git config user.email \"chef-versioner@chef.io\"")
+        run_command("git config user.name \"Chef Versioner\"")
       end
 
       run_command("git add -A")
@@ -46,6 +48,7 @@ module Lita
     end
 
     def run_command(command, cwd: repo_directory)
+      Lita.logger.info("Running command: '#{command}'")
       shellout = Mixlib::ShellOut.new(
         command,
         cwd: cwd,

@@ -1,64 +1,96 @@
 require "json"
 require "uri"
+require "lita/project_repo"
 
 module Lita
   module Handlers
     class Versioner < Handler
+      attr_reader :project
+      attr_reader :inform_channel
+
       config :jenkins_username, required: true
       config :jenkins_api_token, required: true
+      config :default_inform_channel, default: "engineering-services"
 
       http.post "/github_handler", :github_handler
       route(/^build/, :build, command: true, help: {
         "build PIPELINE <TAG>" => "Kicks off a build for PIPELINE with TAG. TAG default: master"
       })
+      route(/^git_test/, :git_test, command: true)
 
       PROJECTS = {
         harmony: {
           pipeline: "harmony-trigger-ad_hoc",
-          repository: "lita-test" # For testing purposes we are watching this repository.
+          github_url: "git@github.com:chef/lita-test.git",
+          version_bump_command: "bundle install && bundle exec rake version:bump_patch",
+          inform_channel: "engineering-services"
         }
         # chef: {
         #   pipeline: "chef-trigger-release",
-        #   repository: "chef"
+        #   github_url: "https://github.com/chef/lita-test.git",
+        #   version_bump_command: "bundle install && bundle exec rake version:bump_patch"
         # }
       }
 
       def build(response)
+        reset_state
+
         params = response.args
         unless params.length == 1 || params.length == 2
           response.reply("Argument issue. You can run this command like 'build PROJECT <TAG>'.")
           return
         end
 
-        project = params.shift.to_sym
+        project_name = params.shift.to_sym
         build_tag = params.shift || "master"
 
-        if PROJECTS[project].nil?
-          response.reply("Project '#{project}' is not supported yet!")
+        @project = PROJECTS[project_name]
+        if project.nil?
+          response.reply("Project '#{project_name}' is not supported yet!")
           return
         end
 
-        trigger_build(PROJECTS[project][:pipeline], build_tag)
+        trigger_build(build_tag)
+      end
+
+      def git_test(response)
+        reset_state
+
+        params = response.args
+        unless params.length == 1
+          response.reply("Argument issue. You can run this command like 'build PROJECT'.")
+          return
+        end
+
+        project_name = params.shift.to_sym
+
+        @project = PROJECTS[project_name]
+        if project.nil?
+          response.reply("Project '#{project_name}' is not supported yet!")
+          return
+        end
+
+        bump_version_in_git
       end
 
       def github_handler(request, response)
+        reset_state
+
         payload = JSON.parse(request.params["payload"])
 
         event_type = request.env["HTTP_X_GITHUB_EVENT"]
-        repository = payload["repository"]["name"]
+        repository = payload["repository"]["full_name"]
         log "Processing '#{event_type}' event for '#{repository}'."
 
-        target_pipeline = nil
         PROJECTS.each do |project, project_data|
-          if project_data[:repository] == repository
-            log "Found matching project '#{project}'"
-            target_pipeline = project_data[:pipeline]
+          if project_data[:github_url].match /.*(\/|:)#{repository}.git/
+            @project = project_data
             break
           end
         end
 
-        if target_pipeline.nil?
-          log "Repository '#{repository}' is not monitored!"
+        if project.nil?
+          inform("Repository '#{repository}' is not monitored by versioner!")
           return
         end
 
@@ -67,19 +99,31 @@ module Lita
           # https://developer.github.com/v3/activity/events/types/#pullrequestevent
           # If the pull request is merged with some commits
           if payload["action"] == "closed" && payload["pull_request"]["merged"]
-            log "Pull request '#{payload["pull_request"]["url"]}' is merged."
-            # TODO: Update the version, tag and commit.
-            # TODO: Kick off build using the tag we created
-            trigger_build(target_pipeline, "master")
+            bump_version_in_git
+            # TODO: kick off the build with tag.
+            trigger_build("master")
           else
-            log "Skipping..."
+            inform("Looks like '#{payload["pull_request"]["url"]}' is not merged with commits. Skipping.")
           end
         else
-          log "Skipping..."
+          inform("Skipping event '#{event_type}' for '#{repository}'")
         end
       end
 
-      def trigger_build(pipeline, tag)
+      def bump_version_in_git
+        project_repo = ProjectRepo.new(project)
+        begin
+          project_repo.refresh
+          project_repo.bump_version
+          project_repo.tag_and_commit
+        rescue Lita::ProjectRepo::CommandError => e
+          inform(e.to_s)
+          raise
+        end
+      end
+
+      def trigger_build(tag)
+        pipeline = project[:pipeline]
         log "Kicking off a build for #{pipeline} with #{tag}."
 
         status = rest_post("/job/#{pipeline}/buildWithParameters",
@@ -91,12 +135,12 @@ module Lita
           # Raise if response is not 2XX
           status.value
         rescue Net::HTTPServerException => e
-          log "Sorry, received HTTP error #{e.response.code} when kicking off the build!"
-          log status.body
+          inform("Sorry, received HTTP error #{e.response.code} when kicking off the build!")
+          inform(status.body)
           return
         end
 
-        log "Done!"
+        inform("Kicked off a build for '#{pipeline}' with tag '#{tag}'.")
       end
 
       JENKINS_ENDPOINT = "http://manhattan.ci.chef.co/".freeze
@@ -113,8 +157,23 @@ module Lita
         http.request(request)
       end
 
+      def inform(message)
+        if inform_channel.nil?
+          inform_channel_name = project.nil? ? config.default_inform_channel : project[:inform_channel]
+          @inform_channel = Source.new(room: inform_channel_name)
+        end
+
+        log("Informing '#{inform_channel_name}' with: '#{message}'")
+        robot.send_message(inform_channel, message)
+      end
+
       def log(message)
         Lita.logger.info(message)
+      end
+
+      def reset_state
+        @project = nil
+        @inform_channel = nil
       end
 
       Lita.register_handler(self)

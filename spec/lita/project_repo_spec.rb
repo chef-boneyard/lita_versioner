@@ -9,7 +9,12 @@ describe Lita::ProjectRepo do
   let(:project_name) { "lita-versioner" }
   let(:project_url) { "https://github.com/chef/#{project_name}.git" }
   let(:version_bump_cmd) { nil }
-  let(:project_repo) { Lita::ProjectRepo.new(project_url, version_bump_cmd) }
+  let(:project_repo) {
+    Lita::ProjectRepo.new({
+      github_url: project_url,
+      version_bump_command: version_bump_cmd
+    })
+  }
 
   before do
     @current_pwd = Dir.pwd
@@ -70,6 +75,7 @@ describe Lita::ProjectRepo do
 
     it "can bump the version" do
       project_repo.bump_version
+      project_repo.tag_and_commit
       expect(File.read(version_file)).to match /1.1.1/
       expect(project_repo.run_command("git log").stdout).to match /Automatic version bump for lita-versioner by lita-versioner./
     end

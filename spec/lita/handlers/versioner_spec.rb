@@ -24,14 +24,14 @@ describe Lita::Handlers::Versioner, lita_handler: true do
   it "builds with master by default" do
     # lita-rspec is doing something with subject therefore we need expect_any_instance_of here.
     expect_any_instance_of(Lita::Handlers::Versioner).to receive(:trigger_build)
-      .with("harmony-trigger-ad_hoc", "master").and_return(true)
+      .with("master").and_return(true)
     send_command("build harmony")
   end
 
   it "builds with the specified tag" do
     # lita-rspec is doing something with subject therefore we need expect_any_instance_of here.
     expect_any_instance_of(Lita::Handlers::Versioner).to receive(:trigger_build)
-      .with("harmony-trigger-ad_hoc", "example").and_return(true)
+      .with("example").and_return(true)
     send_command("build harmony example")
   end
 
@@ -46,7 +46,7 @@ describe Lita::Handlers::Versioner, lita_handler: true do
         req.headers["X-GitHub-Event"] = event_type
         req.params[:payload] = {
           repository: {
-            name: repository
+            full_name: "chef/#{repository}"
           },
           action: pull_request_action,
           pull_request: {
