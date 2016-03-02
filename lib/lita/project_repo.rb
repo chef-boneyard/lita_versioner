@@ -10,10 +10,12 @@ module Lita
 
     attr_reader :github_url
     attr_reader :version_bump_command
+    attr_reader :version_show_command
 
     def initialize(project)
       @github_url = project[:github_url]
       @version_bump_command = project[:version_bump_command]
+      @version_show_command = project[:version_show_command]
 
       Dir.mkdir(CACHE_DIRECTORY) unless File.exist? CACHE_DIRECTORY
     end
@@ -26,20 +28,32 @@ module Lita
       end
     end
 
+    def read_version
+      raise CommandError, "Can not read the version for project '#{github_url}'." if version_show_command.nil?
+
+      Bundler.with_clean_env do
+        run_command(version_show_command).stdout.chomp
+      end
+    end
+
     def tag_and_commit
+      version = read_version
+
       if !run_command("git config -l").stdout.match /chef-versioner@chef.io/
         run_command("git config user.email \"chef-versioner@chef.io\"")
         run_command("git config user.name \"Chef Versioner\"")
       end
 
       run_command("git add -A")
-      run_command("git commit -m \"Automatic version bump for #{repo_name} by lita-versioner.\"")
-      run_command("git push origin master")
+      run_command("git commit -m \"Bump version of #{repo_name} to #{version} by Chef Versioner.\"")
+      run_command("git tag -a v#{version} -m \"Version tag for #{version}.\"")
+      run_command("git push origin master --tags")
     end
 
     # Clones the repo into cache or refreshes the repo in cache.
     def refresh
       if Dir.exists? repo_directory
+        run_command("git fetch origin")
         run_command("git reset --hard origin/master")
         run_command("git clean -fdx")
       else
@@ -57,7 +71,7 @@ module Lita
       shellout.run_command
 
       raise CommandError, [
-        "Error running git command #{command}:",
+        "Error running command '#{command}':",
         "stdout: #{shellout.stdout}",
         "stderr: #{shellout.stderr}"
       ].join("\n") if shellout.error?

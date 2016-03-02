@@ -23,6 +23,7 @@ module Lita
           pipeline: "harmony-trigger-ad_hoc",
           github_url: "git@github.com:chef/lita-test.git",
           version_bump_command: "bundle install && bundle exec rake version:bump_patch",
+          version_show_command: "bundle exec rake version:show",
           inform_channel: "engineering-services"
         }
         # chef: {
@@ -70,7 +71,8 @@ module Lita
           return
         end
 
-        bump_version_in_git
+        new_version = bump_version_in_git
+        response.reply("Bumped version of '#{project_name}' to #{new_version}")
       end
 
       def github_handler(request, response)
@@ -99,9 +101,8 @@ module Lita
           # https://developer.github.com/v3/activity/events/types/#pullrequestevent
           # If the pull request is merged with some commits
           if payload["action"] == "closed" && payload["pull_request"]["merged"]
-            bump_version_in_git
-            # TODO: kick off the build with tag.
-            trigger_build("master")
+            new_version = bump_version_in_git
+            trigger_build("v#{new_version}")
           else
             inform("Looks like '#{payload["pull_request"]["url"]}' is not merged with commits. Skipping.")
           end
@@ -120,6 +121,9 @@ module Lita
           inform(e.to_s)
           raise
         end
+
+        # we return the version we bumped to
+        project_repo.read_version
       end
 
       def trigger_build(tag)

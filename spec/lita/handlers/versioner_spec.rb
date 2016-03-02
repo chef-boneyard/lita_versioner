@@ -96,6 +96,7 @@ describe Lita::Handlers::Versioner, lita_handler: true do
       let(:pull_request_merged) { true }
 
       it "skips build" do
+        expect_any_instance_of(Lita::Handlers::Versioner).to receive(:bump_version_in_git)
         expect_any_instance_of(Lita::Handlers::Versioner).to receive(:trigger_build)
         generate_github_event
       end
