@@ -164,7 +164,8 @@ module Lita
       def inform(message)
         if inform_channel.nil?
           inform_channel_name = project.nil? ? config.default_inform_channel : project[:inform_channel]
-          @inform_channel = Source.new(room: inform_channel_name)
+          inform_room = Lita::Room.fuzzy_find(inform_channel_name)
+          @inform_channel = Source.new(room: inform_room)
         end
 
         log("Informing '#{inform_channel_name}' with: '#{message}'")
