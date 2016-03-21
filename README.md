@@ -26,7 +26,7 @@ harmony: {
 # }
 ```
 
-Configure a webhook for your Github repository following the instructions [here](https://developer.github.com/guides/delivering-deployments/).
+Configure a webhook for your Github repository following the instructions [here](https://developer.github.com/guides/delivering-deployments/). **Instead of selecting just the `push` event, select "Let me select individual events" and select only `pull request` events.
 
 ## Development
 
@@ -47,9 +47,26 @@ Lita has great documentation. Read [this](http://docs.lita.io/plugin-authoring/)
   IdentityFile /home/lita/.ssh/github
   StrictHostKeyChecking no
   ```
-6. Run lita within the lita development environment:
-  * `bundle exec lita` from your lita dev VM.
-
+6. Install git: `apt-get install git`
+7. Put `lita-versioner` into `lita-dev/workspace`.
+8. Get your Jenkins API token by logging in to https://manhattan.ci.chef.co, clicking your name on the top right, and clicking Configure. Then click "Show API Token" and copy the values for the next step.
+9. Create `lita-versioner/lita_config.rb` with this text:
+   ```ruby
+   Lita.configure do |config|
+     config.handlers.versioner.jenkins_username = "YOUR USERNAME"
+     config.handlers.versioner.jenkins_api_token = "YOUR TOKEN"
+     config.robot.adapter = :shell
+     config.robot.log_level = :debug
+   end
+   ```
+10. Run lita within the lita development environment:
+  * `bundle exec lita` from `workspace/lita-versioner` on your lita dev VM.
+  * You should see this:
+    ```
+    Type "exit" or "quit" to end the session.
+    Lita >
+    ```
+  * From here you can interact with the bot just like on Slack.
 
 ## Questions
 
