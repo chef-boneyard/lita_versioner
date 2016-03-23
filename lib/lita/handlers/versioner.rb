@@ -32,12 +32,14 @@ module Lita
           version_bump_command: "bundle install && bundle exec rake version:bump",
           version_show_command: "bundle exec rake version:show",
           inform_channel: "ship-it"
+        },
+        chefdk: {
+          pipeline: "chefdk-trigger-release",
+          github_url: "git@github.com:chef/chef-dk.git",
+          version_bump_command: "bundle install && bundle exec rake version:bump",
+          version_show_command: "bundle exec rake version:show",
+          inform_channel: "ship-it"
         }
-        # chef: {
-        #   pipeline: "chef-trigger-release",
-        #   github_url: "https://github.com/chef/lita-test.git",
-        #   version_bump_command: "bundle install && bundle exec rake version:bump_patch"
-        # }
       }
 
       def build(response)
