@@ -68,6 +68,21 @@ Lita has great documentation. Read [this](http://docs.lita.io/plugin-authoring/)
     ```
   * From here you can interact with the bot just like on Slack.
 
+## Updating the Bot
+
+To update the bot, you've one more thing to do: Deliver!
+
+1. Create a PR setting the SHA in https://github.com/chef-cookbooks/oc-lita/blob/master/recipes/_plugin_versioner.rb to latest `master` of `lita-versioner` and bumping the version in `https://github.com/chef-cookbooks/oc-lita/blob/master/metadata.rb`.
+2. Get a C/R, and have that person `@delivery approve` the PR.
+3. If you are adding a repository, create or edit the github hook for that repository to point at the acceptance lita (example: https://github.com/chef/chef/settings/hooks/7767887). It should:
+   - Payload URL: http://lita-relay-public-acceptance.chef.co/github_handler
+   - Content type: application/x-www-form-urlencoded
+   - Secret: <blank>
+   - "Let me select individual events." and select only "Pull request" (deselect "Push").
+4. Test it out by merging a PR to your repo.
+5. If it's good, `@delivery deliver` the PR.
+6. Update the above webhook to point at http://lita-relay-public.chef.co/github_handler
+
 ## Questions
 
 You can ask your questions in `#engineering-services` or ping `@serdar` on Slack.
