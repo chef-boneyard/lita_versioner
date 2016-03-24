@@ -47,7 +47,13 @@ module Lita
       run_command("git add -A")
       run_command("git commit -m \"Bump version of #{repo_name} to #{version} by Chef Versioner.\"")
       run_command("git tag -a v#{version} -m \"Version tag for #{version}.\"")
-      run_command("git push origin master --tags")
+      begin
+        run_command("git push origin master --tags")
+      rescue CommandError => e
+        # We need to cleanup the local tag we have created if the push has failed.
+        run_command("git tag -d v#{version}")
+        raise e
+      end
     end
 
     # Clones the repo into cache or refreshes the repo in cache.

@@ -109,14 +109,19 @@ module Lita
         when "pull_request"
           # https://developer.github.com/v3/activity/events/types/#pullrequestevent
           # If the pull request is merged with some commits
-          if payload["action"] == "closed" && payload["pull_request"]["merged"]
-            new_version = bump_version_in_git
-            trigger_build("v#{new_version}")
+          if payload["action"] == "closed"
+            if payload["pull_request"]["merged"]
+              inform("'#{payload["pull_request"]["html_url"]}' is just merged. Working on it...")
+              new_version = bump_version_in_git
+              trigger_build("v#{new_version}")
+            else
+              inform("Skipping: '#{payload["pull_request"]["html_url"]}'. It was closed without merging any commits.")
+            end
           else
-            inform("Looks like '#{payload["pull_request"]["url"]}' is not merged with commits. Skipping.")
+            log("Skipping: '#{payload["pull_request"]["html_url"]}' Action: '#{payload["action"]}' Merged? '#{payload["pull_request"]["merged"]}'")
           end
         else
-          inform("Skipping event '#{event_type}' for '#{repository}'")
+          inform("Skipping event '#{event_type}' for '#{repository}'. I am only handling 'pull_request' events.")
         end
       end
 
