@@ -1,3 +1,4 @@
+require 'spec_helper'
 require 'lita/jenkins_http'
 
 RSpec.describe Lita::JenkinsHTTP do

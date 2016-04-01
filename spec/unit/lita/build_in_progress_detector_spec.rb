@@ -1,3 +1,4 @@
+require 'spec_helper'
 require 'lita/build_in_progress_detector'
 
 RSpec.describe Lita::BuildInProgressDetector do
@@ -78,12 +79,26 @@ RSpec.describe Lita::BuildInProgressDetector do
 
   let(:pipeline_name) { "chefdk" }
 
+  let(:jenkins_username) { "bobotclown" }
+
+  let(:jenkins_api_token) { "0d8ff121f765fd302861209f09f2a0ea" }
+
   subject(:build_in_progress_detector) do
-    described_class.new(pipeline: pipeline_name)
+    described_class.new(pipeline: pipeline_name,
+                        jenkins_username: jenkins_username,
+                        jenkins_api_token: jenkins_api_token)
   end
 
   it "has a pipeline name" do
     expect(build_in_progress_detector.pipeline).to eq(pipeline_name)
+  end
+
+  it "has a jenkins username" do
+    expect(build_in_progress_detector.jenkins_username).to eq(jenkins_username)
+  end
+
+  it "has a jenkins API token" do
+    expect(build_in_progress_detector.jenkins_api_token).to eq(jenkins_api_token)
   end
 
   it "has a list of jobs to query for in-progress builds" do
@@ -92,13 +107,10 @@ RSpec.describe Lita::BuildInProgressDetector do
 
   context "when connecting to jenkins" do
 
-    it "configures a Jenkins HTTP API connection with a username and API token"
-
-  end
-
-  context "when there is an error connecting to jenkins" do
-
-    it "emits a detailed error with the URL it tried to access and the exception raised"
+    it "configures a Jenkins HTTP API connection with a username and API token" do
+      expect(build_in_progress_detector.jenkins_api.username).to eq(jenkins_username)
+      expect(build_in_progress_detector.jenkins_api.api_token).to eq(jenkins_api_token)
+    end
 
   end
 

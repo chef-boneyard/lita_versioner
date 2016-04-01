@@ -1,4 +1,5 @@
-require 'ffi_yajl'
+require "ffi_yajl"
+require "lita/jenkins_http"
 
 module Lita
   class BuildInProgressDetector
@@ -7,10 +8,16 @@ module Lita
 
     VERSION_BUMPER_GIT_REF = "auto_dependency_bump_test"
 
-    attr_reader :pipeline
+    JENKINS_ENDPOINT = "http://manhattan.ci.chef.co/".freeze
 
-    def initialize(pipeline: nil)
+    attr_reader :pipeline
+    attr_reader :jenkins_username
+    attr_reader :jenkins_api_token
+
+    def initialize(pipeline: nil, jenkins_username: nil, jenkins_api_token: nil)
       @pipeline = pipeline
+      @jenkins_username = jenkins_username
+      @jenkins_api_token = jenkins_api_token
     end
 
     def jenkins_jobs
@@ -54,12 +61,17 @@ module Lita
 
     # @api private
     def data_for_build(job, build_number)
-      jenkins_api.get("/job/#{job}/#{build_number}/api/json?pretty=true")
+      jenkins_api.get("/job/#{job}/#{build_number}/api/json?pretty=true").body
     end
 
     # @api private
     def builds_data_for_job(job)
-      jenkins_api.get("job/#{job}/api/json?pretty=true")
+      jenkins_api.get("job/#{job}/api/json?pretty=true").body
+    end
+
+    # @api private
+    def jenkins_api
+      JenkinsHTTP.new(base_uri: JENKINS_ENDPOINT, username: jenkins_username, api_token: jenkins_api_token)
     end
 
   end
