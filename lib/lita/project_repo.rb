@@ -16,8 +16,6 @@ module Lita
       @github_url = project[:github_url]
       @version_bump_command = project[:version_bump_command]
       @version_show_command = project[:version_show_command]
-
-      Dir.mkdir(CACHE_DIRECTORY) unless File.exist? CACHE_DIRECTORY
     end
 
     def bump_version
@@ -39,7 +37,7 @@ module Lita
     def tag_and_commit
       version = read_version
 
-      if !run_command("git config -l").stdout.match /chef-versioner@chef.io/
+      if !run_command("git config -l").stdout.match(/chef-versioner@chef.io/)
         run_command("git config user.email \"chef-versioner@chef.io\"")
         run_command("git config user.name \"Chef Versioner\"")
       end
@@ -58,6 +56,8 @@ module Lita
 
     # Clones the repo into cache or refreshes the repo in cache.
     def refresh
+      ensure_cache_dir_exists
+
       if Dir.exists? repo_directory
         run_command("git fetch origin")
         run_command("git reset --hard origin/master")
@@ -95,5 +95,10 @@ module Lita
       #   git@github.com:chef-cookbooks/languages.git
       github_url.match(/.*\/(.*)\.git$/)[1]
     end
+
+    def ensure_cache_dir_exists
+      Dir.mkdir(CACHE_DIRECTORY) unless File.exist? CACHE_DIRECTORY
+    end
+
   end
 end
