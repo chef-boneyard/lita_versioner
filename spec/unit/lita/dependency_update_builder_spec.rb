@@ -23,14 +23,6 @@ RSpec.describe Lita::DependencyUpdateBuilder do
     allow(Lita).to receive(:logger).and_return(logger)
   end
 
-
-  # synchronize_repo
-  # stop if dont_bump_deps_file_present?
-  # fetch_dep_updates
-  # stop if no_deps_updated?
-  # stop unless should_submit_changes_for_build?
-  # submit_build
-
   it "has a project repo" do
     expect(dependency_update_builder.project_repo.github_url).to eq(repo_url)
   end
@@ -176,7 +168,7 @@ RSpec.describe Lita::DependencyUpdateBuilder do
 
             it "should submit the changes for a new build" do
               expect(project_repo).to receive(:refresh)
-              expect(dependency_update_builder).to receive(:submit_build)
+              expect(dependency_update_builder).to receive(:push_changes_to_upstream)
               expect(dependency_update_builder.run).to be(true)
             end
 
@@ -201,7 +193,7 @@ RSpec.describe Lita::DependencyUpdateBuilder do
 
           it "should submit the changes for new build" do
             expect(project_repo).to receive(:refresh)
-            expect(dependency_update_builder).to receive(:submit_build)
+            expect(dependency_update_builder).to receive(:push_changes_to_upstream)
             expect(dependency_update_builder.run).to be(true)
           end
 
@@ -209,10 +201,14 @@ RSpec.describe Lita::DependencyUpdateBuilder do
 
       end
 
-      describe "submitting a build" do
-        # commit_and_push
-        # submit_jenkins_job
-        # update_last_built_branch
+      describe "pushing changes to upstream" do
+
+        it "force commits to the dependency branch" do
+          expect(project_repo).to receive(:force_commit_to_branch).
+            with(dependency_branch)
+          dependency_update_builder.push_changes_to_upstream
+        end
+
       end
 
     end

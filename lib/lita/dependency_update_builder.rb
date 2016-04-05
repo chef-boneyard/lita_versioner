@@ -43,13 +43,9 @@ module Lita
         return false
       end
 
-      submit_build
+      push_changes_to_upstream
 
       true
-    end
-
-    def submit_build
-      raise "TODO"
     end
 
     def synchronize_repo
@@ -76,6 +72,10 @@ module Lita
       return true if project_repo.time_since_last_commit_on(dependency_branch) > QUIET_TIME_S
 
       false
+    end
+
+    def push_changes_to_upstream
+      project_repo.force_commit_to_branch(dependency_branch)
     end
 
   end

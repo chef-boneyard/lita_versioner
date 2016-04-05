@@ -171,6 +171,37 @@ RSpec.describe Lita::ProjectRepo do
     end
   end
 
+  describe "force_commit_to_branch" do
+
+    let(:config_check_shellout) { double("Mixlib::ShellOut", error?: false, stdout: "") }
+
+    let(:config_email_shellout) { double("Mixlib::ShellOut", error?: false) }
+    let(:config_user_shellout) { double("Mixlib::ShellOut", error?: false) }
+    let(:git_checkout_shellout) { double("Mixlib::ShellOut", error?: false) }
+    let(:git_add_shellout) { double("Mixlib::ShellOut", error?: false) }
+    let(:git_commit_shellout) { double("Mixlib::ShellOut", error?: false) }
+    let(:git_push_shellout) { double("Mixlib::ShellOut", error?: false) }
+
+    it "configures committer info, commits to a branch and force-pushes the branch" do
+      [
+        [ "git config -l", config_check_shellout ],
+        [ "git config user.email \"chef-versioner@chef.io\"", config_email_shellout ],
+        [ "git config user.name \"Chef Versioner\"", config_user_shellout ],
+        [ "git checkout -B auto_dependency_bump_test", git_checkout_shellout ],
+        [ "git add -A", git_add_shellout ],
+        [ "git commit -m \"Automatic dependency update by Chef Versioner\"", git_commit_shellout ],
+        [ "git push origin auto_dependency_bump_test --force", git_push_shellout ],
+      ].each do |command_string, shellout_object|
+        expect(Mixlib::ShellOut).to receive(:new).
+          with(command_string, cwd: "./cache/omnibus-harmony", timeout: 3600).
+          and_return(shellout_object)
+        expect(shellout_object).to receive(:run_command)
+      end
+
+      project_repo.force_commit_to_branch("auto_dependency_bump_test")
+    end
+  end
+
   describe "checking for changes" do
 
     let(:diff_index_shellout) { double("Mixlib::ShellOut", error?: false, stdout: diff_index_output) }

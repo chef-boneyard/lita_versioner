@@ -50,10 +50,7 @@ module Lita
     def tag_and_commit
       version = read_version
 
-      if !run_command("git config -l").stdout.match(/chef-versioner@chef.io/)
-        run_command("git config user.email \"chef-versioner@chef.io\"")
-        run_command("git config user.name \"Chef Versioner\"")
-      end
+      ensure_git_config_set
 
       run_command("git add -A")
       run_command("git commit -m \"Bump version of #{repo_name} to #{version} by Chef Versioner.\"")
@@ -65,6 +62,14 @@ module Lita
         run_command("git tag -d v#{version}")
         raise e
       end
+    end
+
+    def force_commit_to_branch(branch_name)
+      ensure_git_config_set
+      run_command("git checkout -B #{branch_name}")
+      run_command("git add -A")
+      run_command("git commit -m \"Automatic dependency update by Chef Versioner\"")
+      run_command("git push origin #{branch_name} --force")
     end
 
     # Clones the repo into cache or refreshes the repo in cache.
@@ -130,6 +135,13 @@ module Lita
       #   https://github.com/litaio/development-environment.git
       #   git@github.com:chef-cookbooks/languages.git
       github_url.match(/.*\/(.*)\.git$/)[1]
+    end
+
+    def ensure_git_config_set
+      if !run_command("git config -l").stdout.match(/chef-versioner@chef.io/)
+        run_command("git config user.email \"chef-versioner@chef.io\"")
+        run_command("git config user.name \"Chef Versioner\"")
+      end
     end
 
     def ensure_cache_dir_exists
