@@ -11,11 +11,13 @@ module Lita
     attr_reader :github_url
     attr_reader :version_bump_command
     attr_reader :version_show_command
+    attr_reader :dependency_update_command
 
     def initialize(project)
       @github_url = project[:github_url]
       @version_bump_command = project[:version_bump_command]
       @version_show_command = project[:version_show_command]
+      @dependency_update_command = project[:dependency_update_command]
     end
 
     def bump_version
@@ -23,6 +25,17 @@ module Lita
 
       Bundler.with_clean_env do
         run_command(version_bump_command)
+      end
+    end
+
+    def update_dependencies
+      if dependency_update_command.nil?
+        raise CommandError,
+          "Can not update deps for project '#{github_url}'; no dependency_update_command provided to initializer."
+      end
+
+      Bundler.with_clean_env do
+        run_command(dependency_update_command)
       end
     end
 

@@ -9,11 +9,14 @@ RSpec.describe Lita::ProjectRepo do
 
   let(:version_bump_command) { "bundle install && bundle exec rake version:bump_patch" }
 
+  let(:dependency_update_command) { "bundle install && bundle exec rake dependencies" }
+
   let(:project_options) do
     {
       github_url: git_url,
       version_show_command: version_show_command,
       version_bump_command: version_bump_command,
+      dependency_update_command: dependency_update_command,
     }
   end
 
@@ -103,6 +106,20 @@ RSpec.describe Lita::ProjectRepo do
 
     end
 
+  end
+
+  describe "update dependencies" do
+
+    let(:dep_update_shellout) { double("Mixlib::ShellOut", error?: false) }
+
+    it "runs the version bump command" do
+      expect(Mixlib::ShellOut).to receive(:new).
+        with(dependency_update_command, cwd: "./cache/omnibus-harmony", timeout: 3600).
+        and_return(dep_update_shellout)
+      expect(dep_update_shellout).to receive(:run_command)
+
+      project_repo.update_dependencies
+    end
   end
 
   describe "bump version" do
