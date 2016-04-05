@@ -6,7 +6,7 @@ module Lita
 
     PIPELINE_JOBS = %w[ build test ].freeze
 
-    VERSION_BUMPER_GIT_REF = "auto_dependency_bump_test"
+    VERSION_BUMPER_GIT_REF = "auto_dependency_bump_test".freeze
 
     JENKINS_ENDPOINT = "http://manhattan.ci.chef.co/".freeze
 
