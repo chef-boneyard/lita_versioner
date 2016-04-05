@@ -67,6 +67,29 @@ module Lita
       end
     end
 
+    # checks if there are any modified files that are tracked by git
+    def has_modified_files?(compared_to_ref="HEAD")
+      !run_command("git diff-index --name-only #{compared_to_ref}").stdout.strip.empty?
+    end
+
+    def branch_exists?(branch_name)
+      run_command("git rev-parse --verify #{branch_name}")
+      true
+    rescue CommandError
+      false
+    end
+
+    def has_file?(path_from_repo_root)
+      File.exist?(File.join(repo_directory, path_from_repo_root))
+    end
+
+    # calculates the time since the last com
+    def time_since_last_commit_on(git_ref)
+      now = Time.new.to_i
+      commit_time = run_command("git show -s --format=\"%ct\" #{git_ref}").stdout.strip.to_i
+      now - commit_time
+    end
+
     def run_command(command, cwd: repo_directory)
       Lita.logger.info("Running command: '#{command}'")
       shellout = Mixlib::ShellOut.new(

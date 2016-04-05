@@ -56,9 +56,6 @@ RSpec.describe Lita::ProjectRepo do
     before do
       allow(File).to receive(:exist?).and_return(false)
       expect(Dir).to receive(:mkdir).with("./cache")
-
-      x = double("Please stub calls to Mixlib::ShellOut.new with exact arguments")
-      allow(Mixlib::ShellOut).to receive(:new).and_return(x)
     end
 
     context "when the repo isn't cloned" do
@@ -112,11 +109,6 @@ RSpec.describe Lita::ProjectRepo do
 
     let(:bump_shellout) { double("Mixlib::ShellOut", error?: false) }
 
-    before do
-      x = double("Please stub calls to Mixlib::ShellOut.new with exact arguments")
-      allow(Mixlib::ShellOut).to receive(:new).and_return(x)
-    end
-
     it "runs the version bump command" do
       expect(Mixlib::ShellOut).to receive(:new).
         with(version_bump_command, cwd: "./cache/omnibus-harmony", timeout: 3600).
@@ -159,6 +151,139 @@ RSpec.describe Lita::ProjectRepo do
       end
 
       project_repo.tag_and_commit
+    end
+  end
+
+  describe "checking for changes" do
+
+    let(:diff_index_shellout) { double("Mixlib::ShellOut", error?: false, stdout: diff_index_output) }
+
+    let(:diff_target) { "HEAD" }
+
+    before do
+      expect(Mixlib::ShellOut).to receive(:new).
+             with("git diff-index --name-only #{diff_target}", cwd: "./cache/omnibus-harmony", timeout: 3600).
+             and_return(diff_index_shellout)
+      expect(diff_index_shellout).to receive(:run_command)
+    end
+
+    context "when there are no changes" do
+
+      let(:diff_index_output) { "\n" }
+
+      it "queries git for changes" do
+        expect(project_repo.has_modified_files?).to be(false)
+      end
+
+    end
+
+    context "where there are changes" do
+
+      let(:diff_index_output) { "Gemfile.lock\n" }
+
+      it "queries git for changes" do
+        expect(project_repo.has_modified_files?).to be(true)
+      end
+
+    end
+
+    describe "compared against a specific branch" do
+
+      let(:diff_index_output) { "Gemfile.lock\n" }
+
+      let(:diff_target) { "auto_dependency_bump_test" }
+
+      it "queries git for changes" do
+        expect(project_repo.has_modified_files?(diff_target)).to be(true)
+      end
+
+    end
+
+  end
+
+  describe "has file?" do
+
+    let(:file_path_from_repo_root) { ".disable_dependency_updates" }
+
+    context "when the file exists" do
+
+      before do
+        allow(File).to receive(:exist?).
+          with("./cache/omnibus-harmony/.disable_dependency_updates").
+          and_return(true)
+      end
+
+      it "returns true" do
+        expect(project_repo.has_file?(file_path_from_repo_root)).to be(true)
+      end
+
+    end
+
+    context "when the file doesn't exist" do
+
+      before do
+        allow(File).to receive(:exist?).
+          with("./cache/omnibus-harmony/.disable_dependency_updates").
+          and_return(false)
+      end
+
+      it "returns false" do
+        expect(project_repo.has_file?(file_path_from_repo_root)).to be(false)
+      end
+
+    end
+
+  end
+
+  describe "branch exists?" do
+
+    before do
+      expect(Mixlib::ShellOut).to receive(:new).
+        with("git rev-parse --verify auto_dependency_bump_test", cwd: "./cache/omnibus-harmony", timeout: 3600).
+        and_return(git_rev_parse_shellout)
+      expect(git_rev_parse_shellout).to receive(:run_command)
+    end
+
+    context "when the branch exists" do
+
+      let(:git_rev_parse_shellout) { double("Mixlib::ShellOut", error?: false) }
+
+      it "returns true" do
+        expect(project_repo.branch_exists?("auto_dependency_bump_test")).to be(true)
+      end
+
+    end
+
+    context "when the branch doesn't exist" do
+
+      let(:git_rev_parse_shellout) { double("Mixlib::ShellOut", error?: true, stdout: "", stderr: "fatal: Needed a single revision") }
+
+      it "returns false" do
+        expect(project_repo.branch_exists?("auto_dependency_bump_test")).to be(false)
+      end
+
+    end
+  end
+
+  describe "time since last commit" do
+
+    let(:last_commit_unix_time) { "1459810710\n" }
+
+    let(:git_show_shellout) { double("Mixlib::ShellOut", error?: false, stdout: last_commit_unix_time) }
+
+    let(:now) { Time.at(1459816660) }
+
+    before do
+      expect(Mixlib::ShellOut).to receive(:new).
+        with("git show -s --format=\"%ct\" auto_dependency_bump_test", cwd: "./cache/omnibus-harmony", timeout: 3600).
+        and_return(git_show_shellout)
+      expect(git_show_shellout).to receive(:run_command)
+
+      expect(Time).to receive(:new).and_return(now)
+    end
+
+    it "queries git to determine the time since the last commit" do
+      expect(project_repo.time_since_last_commit_on("auto_dependency_bump_test")).to eq(5950)
     end
   end
 
