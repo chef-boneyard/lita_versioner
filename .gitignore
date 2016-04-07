@@ -17,3 +17,4 @@ test/version_tmp
 tmp
 
 cache/
+lita_config.rb
