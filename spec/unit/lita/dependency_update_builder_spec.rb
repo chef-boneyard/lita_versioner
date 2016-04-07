@@ -9,8 +9,10 @@ RSpec.describe Lita::DependencyUpdateBuilder do
 
   let(:dependency_branch) { "auto_dependency_bump_test" }
 
+  let(:dependency_update_command) { "bundle install && bundle exec rake dependencies" }
+
   subject(:dependency_update_builder) do
-    described_class.new(repo_url: repo_url, dependency_branch: dependency_branch)
+    described_class.new(repo_url: repo_url, dependency_branch: dependency_branch, dependency_update_command: dependency_update_command)
   end
 
   let(:logger) do

@@ -16,14 +16,16 @@ module Lita
 
     attr_reader :repo_url
     attr_reader :dependency_branch
+    attr_reader :dependency_update_command
 
-    def initialize(repo_url:, dependency_branch:)
+    def initialize(repo_url:, dependency_branch:, dependency_update_command:)
       @repo_url = repo_url
       @dependency_branch = dependency_branch
+      @dependency_update_command = dependency_update_command
     end
 
     def project_repo
-      @repo ||= ProjectRepo.new(github_url: repo_url)
+      @repo ||= ProjectRepo.new(github_url: repo_url, dependency_update_command: dependency_update_command)
     end
 
     def run
