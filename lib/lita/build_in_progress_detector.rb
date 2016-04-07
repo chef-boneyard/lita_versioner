@@ -66,7 +66,7 @@ module Lita
 
     # @api private
     def builds_data_for_job(job)
-      jenkins_api.get("job/#{job}/api/json?pretty=true").body
+      jenkins_api.get("/job/#{job}/api/json?pretty=true").body
     end
 
     # @api private

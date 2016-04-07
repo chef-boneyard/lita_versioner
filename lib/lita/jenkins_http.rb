@@ -26,7 +26,7 @@ module Lita
 
       def generate_error_string
         error_string =<<-ERROR_MESSAGE
-Jenkins API Request failed with #{exception.class}
+Jenkins API Request failed with #{cause.class}
 
 Request Data:
 - Base URI: #{base_uri}
@@ -81,7 +81,6 @@ HTTP_ERROR_INFO
 
     def post(path, parameters)
       full_path = [path, URI.encode_www_form(parameters)].join("?")
-      #client.request(request(:Post, full_path))
       send_request(:Post, full_path)
     end
 
@@ -100,6 +99,8 @@ HTTP_ERROR_INFO
 
     # @api private
     def request(method, path)
+      path = "/#{path}" unless path.start_with?("/")
+
       req_class = Net::HTTP.const_get(method)
       req = req_class.new(path)
       req.basic_auth(username, api_token)

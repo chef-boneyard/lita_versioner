@@ -35,6 +35,8 @@ module Lita
         return false
       end
 
+      update_dependencies
+
       unless dependencies_updated?
         Lita.logger.info "dependencies on master are up to date"
         return false

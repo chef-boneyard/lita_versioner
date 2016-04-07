@@ -174,7 +174,7 @@ RSpec.describe Lita::JenkinsHTTP do
           expect(jenkins_http.client).to receive(:request).with(expected_request).and_return(response)
           expect { jenkins_http.get(path) }.to raise_error(Lita::JenkinsHTTP::JenkinsHTTPError) do |e|
             expect(e.to_s).to eq(<<-ERROR_MESSAGE)
-Jenkins API Request failed with Lita::JenkinsHTTP::JenkinsHTTPError
+Jenkins API Request failed with Net::HTTPFatalError
 
 Request Data:
 - Base URI: http://jenkins.example
@@ -205,7 +205,7 @@ ERROR_MESSAGE
           expect(jenkins_http.client).to receive(:request).with(expected_request).and_raise(network_exception)
           expect { jenkins_http.get(path) }.to raise_error(Lita::JenkinsHTTP::JenkinsHTTPError) do |e|
             expect(e.to_s).to eq(<<-ERROR_MESSAGE)
-Jenkins API Request failed with Lita::JenkinsHTTP::JenkinsHTTPError
+Jenkins API Request failed with Errno::ECONNREFUSED
 
 Request Data:
 - Base URI: http://jenkins.example

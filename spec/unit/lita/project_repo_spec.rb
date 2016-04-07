@@ -210,7 +210,7 @@ RSpec.describe Lita::ProjectRepo do
 
     before do
       expect(Mixlib::ShellOut).to receive(:new).
-             with("git diff-index --name-only #{diff_target}", cwd: "./cache/omnibus-harmony", timeout: 3600).
+             with("git diff --name-only #{diff_target}", cwd: "./cache/omnibus-harmony", timeout: 3600).
              and_return(diff_index_shellout)
       expect(diff_index_shellout).to receive(:run_command)
     end

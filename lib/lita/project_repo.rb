@@ -87,7 +87,7 @@ module Lita
 
     # checks if there are any modified files that are tracked by git
     def has_modified_files?(compared_to_ref="HEAD")
-      !run_command("git diff-index --name-only #{compared_to_ref}").stdout.strip.empty?
+      !run_command("git diff --name-only #{compared_to_ref}").stdout.strip.empty?
     end
 
     def branch_exists?(branch_name)
@@ -113,7 +113,7 @@ module Lita
       shellout = Mixlib::ShellOut.new(
         command,
         cwd: cwd,
-        timeout: 3600
+        timeout: 3600,
       )
       shellout.run_command
 

@@ -96,6 +96,7 @@ RSpec.describe Lita::DependencyUpdateBuilder do
 
         it "doesn't create a branch or start a build" do
           expect(project_repo).to receive(:refresh)
+          expect(project_repo).to receive(:update_dependencies)
           expect(dependency_update_builder.run).to be(false)
         end
       end
@@ -151,6 +152,7 @@ RSpec.describe Lita::DependencyUpdateBuilder do
 
             it "should not submit the changes for a new build" do
               expect(project_repo).to receive(:refresh)
+              expect(project_repo).to receive(:update_dependencies)
               expect(dependency_update_builder.run).to be(false)
             end
 
@@ -170,6 +172,7 @@ RSpec.describe Lita::DependencyUpdateBuilder do
 
             it "should submit the changes for a new build" do
               expect(project_repo).to receive(:refresh)
+              expect(project_repo).to receive(:update_dependencies)
               expect(dependency_update_builder).to receive(:push_changes_to_upstream)
               expect(dependency_update_builder.run).to be(true)
             end
@@ -195,6 +198,7 @@ RSpec.describe Lita::DependencyUpdateBuilder do
 
           it "should submit the changes for new build" do
             expect(project_repo).to receive(:refresh)
+            expect(project_repo).to receive(:update_dependencies)
             expect(dependency_update_builder).to receive(:push_changes_to_upstream)
             expect(dependency_update_builder.run).to be(true)
           end
