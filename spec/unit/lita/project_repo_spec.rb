@@ -320,6 +320,37 @@ RSpec.describe Lita::ProjectRepo do
     end
   end
 
+  describe "deleting a branch" do
+
+    before do
+      expect(Mixlib::ShellOut).to receive(:new).
+        with("git branch -D auto_dependency_bump_test", cwd: "./cache/omnibus-harmony", timeout: 3600).
+        and_return(git_branch_shellout)
+      expect(git_branch_shellout).to receive(:run_command)
+    end
+
+    context "when the branch exists" do
+
+      let(:git_branch_shellout) { double("Mixlib::ShellOut", error?: false) }
+
+      it "removes the branch" do
+        expect(project_repo.delete_branch("auto_dependency_bump_test")).to be(true)
+      end
+
+    end
+
+    context "when the branch doesn't exist" do
+
+      let(:git_branch_shellout) { double("Mixlib::ShellOut", error?: true, stdout: "", stderr: "fatal: Needed a single revision") }
+
+      it "doesn't error" do
+        expect(project_repo.delete_branch("auto_dependency_bump_test")).to be(false)
+      end
+
+    end
+
+  end
+
   describe "time since last commit" do
 
     let(:last_commit_unix_time) { "1459810710\n" }

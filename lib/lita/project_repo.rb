@@ -88,12 +88,18 @@ module Lita
 
     # checks if there are any modified files that are tracked by git
     def has_modified_files?(compared_to_ref="HEAD")
-      #!run_command("git diff --name-only #{compared_to_ref}").stdout.strip.empty?
       !run_command("git diff #{compared_to_ref}").stdout.strip.empty?
     end
 
     def branch_exists?(branch_name)
       run_command("git rev-parse --verify #{branch_name}")
+      true
+    rescue CommandError
+      false
+    end
+
+    def delete_branch(branch_name)
+      run_command("git branch -D #{branch_name}")
       true
     rescue CommandError
       false
