@@ -25,6 +25,10 @@ module Lita
         command: true,
         help: { "bump-deps PROJECT" => "Runs the dependency bumper and submits a build if there are new deps" })
 
+      route(/^forget-bump-deps-builds/, :forget_bump_deps_builds,
+        command: true,
+        help: { "forget-bump-deps-builds PROJECT" => "Forget failed bump-deps builds (fixes 'waiting for the quiet period to expire before building again')" })
+
       PROJECTS = {
         chefdk: {
           pipeline: "chefdk-trigger-release",
@@ -40,7 +44,6 @@ module Lita
         project_name = response.args.first
         # if project_name.nil? then reply w/ help (?)
         # unless PROJECTS.has_key?(project_name.to_sym) then reploy w/ err, list of known projects
-        #update_dependencies_from_command
         build_triggered, reason = update_dependencies(project_name)
 
         if build_triggered
@@ -50,6 +53,16 @@ module Lita
         end
       end
 
+      def forget_bump_deps_builds(response)
+        project_name = response.args.first
+        # if project_name.nil? then reply w/ help (?)
+        # unless PROJECTS.has_key?(project_name.to_sym) then reploy w/ err, list of known projects
+        project_info = PROJECTS[project_name.to_sym]
+
+        repo = ProjectRepo.new(project_info)
+        repo.refresh
+        repo.delete_branch(DEPENDENCY_BRANCH_NAME)
+      end
 
       def setup_polling
         every(600) do |timer|
