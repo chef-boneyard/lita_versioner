@@ -3,12 +3,14 @@ require "uri"
 require "lita/build_in_progress_detector"
 require "lita/dependency_update_builder"
 require "lita/project_repo"
+require "lita/jenkins_http"
 
 module Lita
   module Handlers
     class DependencyUpdater < Handler
 
       DEPENDENCY_BRANCH_NAME = "auto_dependency_bump_test".freeze
+      JENKINS_ENDPOINT = "http://manhattan.ci.chef.co/".freeze
 
       attr_reader :project
       attr_reader :inform_channel
@@ -24,20 +26,6 @@ module Lita
         help: { "bump-deps PROJECT" => "Runs the dependency bumper and submits a build if there are new deps" })
 
       PROJECTS = {
-      ##   harmony: {
-      ##     pipeline: "harmony-trigger-ad_hoc",
-      ##     github_url: "git@github.com:chef/lita-test.git",
-      ##     version_bump_command: "bundle install && bundle exec rake version:bump_patch",
-      ##     version_show_command: "bundle exec rake version:show",
-      ##     inform_channel: "engineering-services"
-      ##   },
-      ##   chef: {
-      ##     pipeline: "chef-trigger-release",
-      ##     github_url: "git@github.com:chef/chef.git",
-      ##     version_bump_command: "bundle install && bundle exec rake version:bump",
-      ##     version_show_command: "bundle exec rake version:show",
-      ##     inform_channel: "ship-it"
-      ##   },
         chefdk: {
           pipeline: "chefdk-trigger-release",
           github_url: "git@github.com:chef/chef-dk.git",
@@ -53,8 +41,15 @@ module Lita
         # if project_name.nil? then reply w/ help (?)
         # unless PROJECTS.has_key?(project_name.to_sym) then reploy w/ err, list of known projects
         #update_dependencies_from_command
-        update_dependencies(project_name)
+        build_triggered, reason = update_dependencies(project_name)
+
+        if build_triggered
+          response.reply("Started build with updated dependencies.")
+        else
+          response.reply("Build not triggered: #{reason}")
+        end
       end
+
 
       def setup_polling
         every(600) do |timer|
@@ -70,26 +65,32 @@ module Lita
                                                        jenkins_api_token: config.jenkins_api_token)
         if conflict_checker.conflicting_build_running?
           Lita.logger.info("Conflicting build in progress, skipping dependency update")
-          # reply if this was a slack command
-          # early return
+          return [false, "Conflicting build in progress, skipping dependency update"]
         end
 
         dep_builder = DependencyUpdateBuilder.new(repo_url: project_info[:github_url],
                                                   dependency_branch: DEPENDENCY_BRANCH_NAME,
                                                   dependency_update_command: project_info[:dependency_update_command])
 
-        if dep_builder.run
-          # trigger_jenkins_job
-          # notify channel of jenkins job
-          status = rest_post("/job/#{pipeline}/buildWithParameters",
-            "GIT_REF" => tag,
-            "EXPIRE_CACHE" => false
-          )
-
-
+        dependencies_updated, reason = dep_builder.run
+        if dependencies_updated
+          # TODO: re-enable (should be configurable?)
+          Lita.logger.info("Would have triggered a build")
+          #trigger_jenkins_job(pipeline_name)
+          [true, "build started"]
         else
-          # reply if this was a slack command
+          [false, reason]
         end
+      end
+
+      def trigger_jenkins_job(pipeline)
+        jenkins = JenkinsHTTP.new(base_uri: JENKINS_ENDPOINT,
+                                  username: config.jenkins_username,
+                                  api_token: config.jenkins_api_token)
+        # notify channel of jenkins job
+        jenkins.post("/job/#{pipeline}-trigger-ad_hoc/buildWithParameters",
+                     "GIT_REF" => DEPENDENCY_BRANCH_NAME,
+                     "EXPIRE_CACHE" => false)
       end
 
 

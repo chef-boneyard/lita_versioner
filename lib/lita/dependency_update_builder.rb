@@ -31,25 +31,28 @@ module Lita
     def run
       synchronize_repo
       if dependency_updates_disabled?
-        Lita.logger.info "dependency updates disabled, skipping"
-        return false
+        message = "dependency updates disabled, skipping"
+        Lita.logger.info(message)
+        return [ false, message ]
       end
 
       update_dependencies
 
       unless dependencies_updated?
-        Lita.logger.info "dependencies on master are up to date"
-        return false
+        message = "dependencies on master are up to date"
+        Lita.logger.info(message)
+        return [ false, message ]
       end
 
       unless should_submit_changes_for_build?
-        Lita.logger.info "dependency changes failed a previous build. waiting for the quiet period to expire before building again"
-        return false
+        message = "dependency changes failed a previous build. waiting for the quiet period to expire before building again"
+        Lita.logger.info(message)
+        return [ false, message ]
       end
 
       push_changes_to_upstream
 
-      true
+      [ true, "dependency updates pushed to #{dependency_branch}" ]
     end
 
     def synchronize_repo

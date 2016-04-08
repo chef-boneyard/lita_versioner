@@ -60,7 +60,7 @@ RSpec.describe Lita::DependencyUpdateBuilder do
 
       it "does not run any dependency update or build steps" do
         expect(project_repo).to receive(:refresh)
-        expect(dependency_update_builder.run).to be(false)
+        expect(dependency_update_builder.run).to eq([false, "dependency updates disabled, skipping"])
       end
 
     end
@@ -97,7 +97,7 @@ RSpec.describe Lita::DependencyUpdateBuilder do
         it "doesn't create a branch or start a build" do
           expect(project_repo).to receive(:refresh)
           expect(project_repo).to receive(:update_dependencies)
-          expect(dependency_update_builder.run).to be(false)
+          expect(dependency_update_builder.run).to eq([false, "dependencies on master are up to date"])
         end
       end
 
@@ -153,7 +153,8 @@ RSpec.describe Lita::DependencyUpdateBuilder do
             it "should not submit the changes for a new build" do
               expect(project_repo).to receive(:refresh)
               expect(project_repo).to receive(:update_dependencies)
-              expect(dependency_update_builder.run).to be(false)
+              message = "dependency changes failed a previous build. waiting for the quiet period to expire before building again"
+              expect(dependency_update_builder.run).to eq([false, message])
             end
 
           end
@@ -174,7 +175,7 @@ RSpec.describe Lita::DependencyUpdateBuilder do
               expect(project_repo).to receive(:refresh)
               expect(project_repo).to receive(:update_dependencies)
               expect(dependency_update_builder).to receive(:push_changes_to_upstream)
-              expect(dependency_update_builder.run).to be(true)
+              expect(dependency_update_builder.run).to eq([true, "dependency updates pushed to auto_dependency_bump_test"])
             end
 
           end
@@ -200,7 +201,7 @@ RSpec.describe Lita::DependencyUpdateBuilder do
             expect(project_repo).to receive(:refresh)
             expect(project_repo).to receive(:update_dependencies)
             expect(dependency_update_builder).to receive(:push_changes_to_upstream)
-            expect(dependency_update_builder.run).to be(true)
+            expect(dependency_update_builder.run).to eq([true, "dependency updates pushed to auto_dependency_bump_test"])
           end
 
         end
