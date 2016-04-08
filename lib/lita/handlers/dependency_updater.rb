@@ -19,7 +19,7 @@ module Lita
       config :jenkins_api_token, required: true
       config :default_inform_channel, default: "engineering-services"
 
-      #on :loaded, :setup_polling
+      on :loaded, :setup_polling
 
       route(/^bump\-deps/, :update_dependencies_from_command,
         command: true,
@@ -64,9 +64,14 @@ module Lita
         repo.delete_branch(DEPENDENCY_BRANCH_NAME)
       end
 
-      def setup_polling
+      def setup_polling(args)
+        # TODO: this needs to be configurable so we can disable it in
+        # acceptance
         every(600) do |timer|
-
+          PROJECTS.keys.each do |project|
+            Lita.logger.info("Running scheduled dependency update for #{project}")
+            update_dependencies(project.to_s)
+          end
         end
       end
 
