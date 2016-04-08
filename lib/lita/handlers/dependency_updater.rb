@@ -18,6 +18,8 @@ module Lita
       config :jenkins_username, required: true
       config :jenkins_api_token, required: true
       config :default_inform_channel, default: "engineering-services"
+      config :polling_interval, default: false
+      config :trigger_real_builds, default: false
 
       on :loaded, :setup_polling
 
@@ -65,9 +67,11 @@ module Lita
       end
 
       def setup_polling(args)
-        # TODO: this needs to be configurable so we can disable it in
-        # acceptance
-        every(600) do |timer|
+        unless config.polling_interval
+          Lita.logger.info "Polling is disabled. Dependency updates will run from chat command only"
+          return false
+        end
+        every(config.polling_interval) do |timer|
           PROJECTS.keys.each do |project|
             Lita.logger.info("Running scheduled dependency update for #{project}")
             update_dependencies(project.to_s)
@@ -92,9 +96,7 @@ module Lita
 
         dependencies_updated, reason = dep_builder.run
         if dependencies_updated
-          # TODO: re-enable (should be configurable?)
-          Lita.logger.info("Would have triggered a build")
-          #trigger_jenkins_job(pipeline_name)
+          trigger_jenkins_job(pipeline_name)
           [true, "build started"]
         else
           [false, reason]
@@ -102,6 +104,11 @@ module Lita
       end
 
       def trigger_jenkins_job(pipeline)
+        unless config.trigger_real_builds
+          Lita.logger.info("Would have triggered a build")
+          return false
+        end
+
         jenkins = JenkinsHTTP.new(base_uri: JENKINS_ENDPOINT,
                                   username: config.jenkins_username,
                                   api_token: config.jenkins_api_token)
