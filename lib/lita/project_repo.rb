@@ -78,6 +78,7 @@ module Lita
 
       if Dir.exists? repo_directory
         run_command("git fetch origin")
+        run_command("git checkout -f master")
         run_command("git reset --hard origin/master")
         run_command("git clean -fdx")
       else
@@ -87,7 +88,8 @@ module Lita
 
     # checks if there are any modified files that are tracked by git
     def has_modified_files?(compared_to_ref="HEAD")
-      !run_command("git diff --name-only #{compared_to_ref}").stdout.strip.empty?
+      #!run_command("git diff --name-only #{compared_to_ref}").stdout.strip.empty?
+      !run_command("git diff #{compared_to_ref}").stdout.strip.empty?
     end
 
     def branch_exists?(branch_name)
@@ -110,11 +112,15 @@ module Lita
 
     def run_command(command, cwd: repo_directory)
       Lita.logger.info("Running command: '#{command}'")
-      shellout = Mixlib::ShellOut.new(
-        command,
+
+      opts = {
         cwd: cwd,
         timeout: 3600,
-      )
+      }
+
+      opts[:live_stream] = $stdout if Lita.logger.debug?
+
+      shellout = Mixlib::ShellOut.new(command, opts)
       shellout.run_command
 
       raise CommandError, [

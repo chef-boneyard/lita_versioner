@@ -23,6 +23,7 @@ RSpec.describe Lita::ProjectRepo do
   let(:logger) do
     double("Logger").tap do |l|
       allow(l).to receive(:info)
+      allow(l).to receive(:debug?).and_return(false)
     end
   end
 
@@ -78,6 +79,7 @@ RSpec.describe Lita::ProjectRepo do
     context "when the repo is cloned" do
 
       let(:fetch_shellout) { double("Mixlib::ShellOut", error?: false) }
+      let(:checkout_shellout) { double("Mixlib::ShellOut", error?: false) }
       let(:reset_shellout) { double("Mixlib::ShellOut", error?: false) }
       let(:clean_shellout) { double("Mixlib::ShellOut", error?: false) }
 
@@ -90,6 +92,11 @@ RSpec.describe Lita::ProjectRepo do
           with("git fetch origin", cwd: "./cache/omnibus-harmony", timeout: 3600).
           and_return(fetch_shellout)
         expect(fetch_shellout).to receive(:run_command)
+
+        expect(Mixlib::ShellOut).to receive(:new).
+          with("git checkout -f master", cwd: "./cache/omnibus-harmony", timeout: 3600).
+          and_return(checkout_shellout)
+        expect(checkout_shellout).to receive(:run_command)
 
         expect(Mixlib::ShellOut).to receive(:new).
           with("git reset --hard origin/master", cwd: "./cache/omnibus-harmony", timeout: 3600).
@@ -210,7 +217,7 @@ RSpec.describe Lita::ProjectRepo do
 
     before do
       expect(Mixlib::ShellOut).to receive(:new).
-             with("git diff --name-only #{diff_target}", cwd: "./cache/omnibus-harmony", timeout: 3600).
+             with("git diff #{diff_target}", cwd: "./cache/omnibus-harmony", timeout: 3600).
              and_return(diff_index_shellout)
       expect(diff_index_shellout).to receive(:run_command)
     end
