@@ -1,0 +1,22 @@
+Lita.configure do |config|
+  # To get your API token:
+  # 1. Go to jenkins and log in.
+  # 2. Click your name on the top right
+  # 3. Click configure on the left
+  # 4. Click "show API token"
+  config.handlers.versioner.jenkins_username = "YOU"
+  config.handlers.versioner.jenkins_api_token = "00000ffff"
+
+  # If set to `false`, polling is disabled entirely
+  # Otherwise, it is the number of seconds between automatic dependency bump
+  # attempts.
+  config.handlers.versioner.polling_interval = false
+
+  # If set to true, the bot will trigger a jenkins build for dependency
+  # updates. Otherwise it will act in a sort of "dry run" mode where it will
+  # log a message instead of triggering a build.
+  config.handlers.versioner.trigger_real_builds = false
+
+  config.robot.adapter = :shell
+  config.robot.log_level = :debug
+end
