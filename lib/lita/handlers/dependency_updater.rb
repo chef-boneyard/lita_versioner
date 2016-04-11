@@ -17,7 +17,6 @@ module Lita
 
       config :jenkins_username, required: true
       config :jenkins_api_token, required: true
-      config :default_inform_channel, default: "engineering-services"
       config :polling_interval, default: false
       config :trigger_real_builds, default: false
 
@@ -105,6 +104,7 @@ module Lita
         dependencies_updated, reason = dep_builder.run
         if dependencies_updated
           trigger_jenkins_job(pipeline_name)
+          inform("Started dependency update build for project #{pipeline_name}", project_info)
           [true, "build started"]
         else
           [false, reason]
@@ -125,6 +125,22 @@ module Lita
                      "GIT_REF" => DEPENDENCY_BRANCH_NAME,
                      "EXPIRE_CACHE" => false)
       end
+
+      def inform(message, project_info)
+        inform_channel_name = project_info[:inform_channel]
+
+        if robot.config.robot.adapter == :shell
+          Lita.logger.info("Would have informed channel #{inform_channel_name} with message: #{message}")
+          return false
+        end
+        inform_room = Lita::Room.fuzzy_find(inform_channel_name)
+        inform_channel = Source.new(room: inform_room)
+
+        Lita.logger.info("Informing '#{inform_channel_name}' with: '#{message}'")
+        robot.send_message(inform_channel, message)
+        true
+      end
+
 
       def project_name_valid?(project_name)
         return false if project_name.nil?
