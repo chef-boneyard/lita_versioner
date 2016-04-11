@@ -8,8 +8,14 @@ module Lita
       attr_reader :project
       attr_reader :inform_channel
 
+      # NOTE: this configuration is shared with other handlers that have
+      # `namespace "versioner"`. Check other handlers before changing or
+      # removing any config settings here.
+
       config :jenkins_username, required: true
       config :jenkins_api_token, required: true
+      config :polling_interval, default: false
+      config :trigger_real_builds, default: false
       config :default_inform_channel, default: "engineering-services"
 
       http.post "/github_handler", :github_handler
@@ -94,7 +100,7 @@ module Lita
         log "Processing '#{event_type}' event for '#{repository}'."
 
         PROJECTS.each do |project, project_data|
-          if project_data[:github_url].match /.*(\/|:)#{repository}.git/
+          if project_data[:github_url].match(/.*(\/|:)#{repository}.git/)
             @project = project_data
             break
           end

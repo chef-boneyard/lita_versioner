@@ -9,16 +9,16 @@ module Lita
   module Handlers
     class DependencyUpdater < Handler
 
+      # Share the "versioner" configuration namespace with the Versioner
+      # handler. This means that config settings are defined in the Versioner's
+      # class definition and not in here.
+      namespace "versioner"
+
       DEPENDENCY_BRANCH_NAME = "auto_dependency_bump_test".freeze
       JENKINS_ENDPOINT = "http://manhattan.ci.chef.co/".freeze
 
       attr_reader :project
       attr_reader :inform_channel
-
-      config :jenkins_username, required: true
-      config :jenkins_api_token, required: true
-      config :polling_interval, default: false
-      config :trigger_real_builds, default: false
 
       on :loaded, :setup_polling
 
