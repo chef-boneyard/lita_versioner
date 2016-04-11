@@ -44,8 +44,12 @@ module Lita
 
       def update_dependencies_from_command(response)
         project_name = response.args.first
-        # if project_name.nil? then reply w/ help (?)
-        # unless PROJECTS.has_key?(project_name.to_sym) then reploy w/ err, list of known projects
+
+        unless project_name_valid?(project_name)
+          response.reply("Invalid project name `#{project_name}'. Valid projects: '#{PROJECTS.keys.join("', '")}'")
+          return false
+        end
+
         build_triggered, reason = update_dependencies(project_name)
 
         if build_triggered
@@ -57,8 +61,12 @@ module Lita
 
       def forget_bump_deps_builds(response)
         project_name = response.args.first
-        # if project_name.nil? then reply w/ help (?)
-        # unless PROJECTS.has_key?(project_name.to_sym) then reploy w/ err, list of known projects
+
+        unless project_name_valid?(project_name)
+          response.reply("Invalid project name `#{project_name}'. Valid projects: '#{PROJECTS.keys.join("', '")}'")
+          return false
+        end
+
         project_info = PROJECTS[project_name.to_sym]
 
         repo = ProjectRepo.new(project_info)
@@ -118,6 +126,11 @@ module Lita
                      "EXPIRE_CACHE" => false)
       end
 
+      def project_name_valid?(project_name)
+        return false if project_name.nil?
+        return false unless PROJECTS.has_key?(project_name.to_sym)
+        true
+      end
 
       Lita.register_handler(self)
     end
