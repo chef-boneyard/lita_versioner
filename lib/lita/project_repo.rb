@@ -109,7 +109,7 @@ module Lita
       File.exist?(File.join(repo_directory, path_from_repo_root))
     end
 
-    # calculates the time since the last com
+    # Time since the last commit on `git_ref` in seconds
     def time_since_last_commit_on(git_ref)
       now = Time.new.to_i
       commit_time = run_command("git show -s --format=\"%ct\" #{git_ref}").stdout.strip.to_i
