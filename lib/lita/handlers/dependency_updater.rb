@@ -104,7 +104,8 @@ module Lita
         dependencies_updated, reason = dep_builder.run
         if dependencies_updated
           trigger_jenkins_job(pipeline_name)
-          inform("Started dependency update build for project #{pipeline_name}", project_info)
+          msg = "Started dependency update build for project #{pipeline_name}. Diff: https://github.com/chef/chef-dk/compare/auto_dependency_bump_test"
+          inform(msg, project_info)
           [true, "build started"]
         else
           [false, reason]
