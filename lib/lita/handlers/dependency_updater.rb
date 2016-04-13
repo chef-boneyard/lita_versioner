@@ -37,7 +37,7 @@ module Lita
           version_bump_command: "bundle install && bundle exec rake version:bump",
           version_show_command: "bundle exec rake version:show",
           dependency_update_command: "bundle install && bundle exec rake dependencies",
-          inform_channel: "ship-it"
+          inform_channel: "workflow-pool"
         }
       }
 
