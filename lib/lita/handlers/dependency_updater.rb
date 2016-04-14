@@ -1,5 +1,6 @@
 require "json"
 require "uri"
+require 'fileutils'
 require "lita/build_in_progress_detector"
 require "lita/dependency_update_builder"
 require "lita/project_repo"
@@ -16,6 +17,9 @@ module Lita
 
       DEPENDENCY_BRANCH_NAME = "auto_dependency_bump_test".freeze
       JENKINS_ENDPOINT = "http://manhattan.ci.chef.co/".freeze
+
+      FAILURE_NOTIFICATION_RATE_LIMIT_FILE = "./cache/failure_notification_rate_limit".freeze
+      FAILURE_NOTIFICATION_QUIET_TIME = 3600
 
       attr_reader :project
       attr_reader :inform_channel
@@ -43,6 +47,7 @@ module Lita
 
       def update_dependencies_from_command(response)
         project_name = response.args.first
+        response.reply("Checking for updated dependencies for #{project_name}...")
 
         unless project_name_valid?(project_name)
           response.reply("Invalid project name `#{project_name}'. Valid projects: '#{PROJECTS.keys.join("', '")}'")
@@ -71,6 +76,7 @@ module Lita
         repo = ProjectRepo.new(project_info)
         repo.refresh
         repo.delete_branch(DEPENDENCY_BRANCH_NAME)
+        response.reply("Deleted local branch #{DEPENDENCY_BRANCH_NAME} of #{project_name}.")
       end
 
       def setup_polling(args)
@@ -110,6 +116,11 @@ module Lita
         else
           [false, reason]
         end
+      rescue => e
+        Lita.logger.error(e)
+        e.backtrace.each { |l| Lita.logger.error("  #{l}") }
+        maybe_notify_about_error(e, pipeline_name, project_info)
+        [ false, "#{e.class.name}:\n#{e.message}" ]
       end
 
       def trigger_jenkins_job(pipeline)
@@ -125,6 +136,26 @@ module Lita
         jenkins.post("/job/#{pipeline}-trigger-ad_hoc/buildWithParameters",
                      "GIT_REF" => DEPENDENCY_BRANCH_NAME,
                      "EXPIRE_CACHE" => false)
+      end
+
+      def maybe_notify_about_error(e, project_name, project_info)
+        if File.exist?(FAILURE_NOTIFICATION_RATE_LIMIT_FILE)
+          now = Time.new
+          last_notification = File.mtime(FAILURE_NOTIFICATION_RATE_LIMIT_FILE)
+          elapsed = now - last_notification
+          if elapsed < FAILURE_NOTIFICATION_QUIET_TIME
+            msg = "Last error #{elapsed.to_i}s ago, quiet period is #{FAILURE_NOTIFICATION_QUIET_TIME}s, suppressing notification."
+            Lita.logger.info(msg)
+            return nil
+          end
+        end
+
+        parent_dir = File.dirname(FAILURE_NOTIFICATION_RATE_LIMIT_FILE)
+        FileUtils.mkdir_p(parent_dir) unless File.exist?(parent_dir)
+        FileUtils.touch(FAILURE_NOTIFICATION_RATE_LIMIT_FILE)
+        message = "Attempted dependency update for #{project_name} failed.\nError was #{e.class.name}:" +
+          "\n```\n#{e.to_s}\n```"
+        inform(message, project_info)
       end
 
       def inform(message, project_info)
