@@ -35,7 +35,7 @@ module Lita
         chef: {
           pipeline: "chef-trigger-release",
           github_url: "git@github.com:chef/chef.git",
-          version_bump_command: "bundle install && bundle exec rake version:bump",
+          version_bump_command: "bundle install --without changelog compat_testing development docgen guard maintenance omnibus_package test tools aix bsd mac_os_x solaris windows && bundle exec rake version:bump",
           version_show_command: "bundle exec rake version:show",
           inform_channel: "workflow-pool"
         },
