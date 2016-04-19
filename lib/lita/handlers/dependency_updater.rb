@@ -38,9 +38,17 @@ module Lita
         chefdk: {
           pipeline: "chefdk-trigger-release",
           github_url: "git@github.com:chef/chef-dk.git",
-          version_bump_command: "bundle install && bundle exec rake version:bump",
+          version_bump_command: "bundle install && bundle exec rake version:bump && git checkout .bundle/config",
           version_show_command: "bundle exec rake version:show",
-          dependency_update_command: "bundle install && bundle exec rake dependencies",
+          dependency_update_command: "bundle install && bundle exec rake dependencies && git checkout .bundle/config",
+          inform_channel: "workflow-pool"
+        },
+        chef: {
+          pipeline: "chef-trigger-release",
+          github_url: "git@github.com:chef/chef.git",
+          version_bump_command: "bundle install && bundle exec rake version:bump && git checkout .bundle/config",
+          version_show_command: "bundle exec rake version:show",
+          dependency_update_command: "bundle install && bundle exec rake dependencies && git checkout .bundle/config",
           inform_channel: "workflow-pool"
         }
       }
@@ -184,4 +192,3 @@ module Lita
     end
   end
 end
-

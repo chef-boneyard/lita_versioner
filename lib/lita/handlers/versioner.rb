@@ -35,14 +35,14 @@ module Lita
         chef: {
           pipeline: "chef-trigger-release",
           github_url: "git@github.com:chef/chef.git",
-          version_bump_command: "bundle install && bundle exec rake version:bump",
+          version_bump_command: "bundle install && bundle exec rake version:bump && git checkout .bundle/config",
           version_show_command: "bundle exec rake version:show",
           inform_channel: "workflow-pool"
         },
         chefdk: {
           pipeline: "chefdk-trigger-release",
           github_url: "git@github.com:chef/chef-dk.git",
-          version_bump_command: "bundle install && bundle exec rake version:bump",
+          version_bump_command: "bundle install && bundle exec rake version:bump && git checkout .bundle/config",
           version_show_command: "bundle exec rake version:show",
           inform_channel: "workflow-pool"
         }
