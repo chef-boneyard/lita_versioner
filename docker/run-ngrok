@@ -1,0 +1,12 @@
+#!/bin/sh
+# cd into the docker directory
+cd "$(dirname "${BASH_SOURCE[0]}" )"
+
+# Download and unzip ngrok
+if [ ! -f ngrok ]; then
+  wget https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-darwin-amd64.zip
+  unzip ngrok-stable-darwin-amd64.zip
+fi
+
+# Run ngrok
+./ngrok http 8080 -log ./ngrok.log

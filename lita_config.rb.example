@@ -7,6 +7,8 @@ Lita.configure do |config|
   config.handlers.versioner.jenkins_username = "YOU"
   config.handlers.versioner.jenkins_api_token = "00000ffff"
 
+  config.redis[:host] = "redis"
+
   # If set to `false`, polling is disabled entirely
   # Otherwise, it is the number of seconds between automatic dependency bump
   # attempts.
@@ -17,6 +19,13 @@ Lita.configure do |config|
   # log a message instead of triggering a build.
   config.handlers.versioner.trigger_real_builds = false
 
+  # Shell config: local config.
   config.robot.adapter = :shell
+
+  # Slack config.
+  # config.robot.adapter = :slack
+  # config.adapters.slack.token = "<SLACK TOKEN HERE>"
+  # config.handlers.versioner.default_inform_channel = "#workflow-pool"
+
   config.robot.log_level = :debug
 end

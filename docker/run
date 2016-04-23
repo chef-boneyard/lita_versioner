@@ -1,0 +1,39 @@
+#!/bin/sh
+
+set -ex
+
+# cd into the docker directory
+cd "$(dirname "${BASH_SOURCE[0]}" )"
+
+# build and run bumpbot-redis if it does not exist
+if [ -z "$(docker ps --format "{{.Names}}" | grep -e "^bumpbot-redis$")" ]; then
+  # remove existing container, if any
+  docker rm -f bumpbot-redis || true
+
+  echo
+  echo -------------------------
+  echo Running bumpbot-redis ...
+  echo -------------------------
+  docker run --name bumpbot-redis -d litaio/redis
+fi
+
+# remove existing container, if any
+docker rm -f bumpbot || true
+
+# build the image if needed
+echo
+echo --------------------------
+echo Building bumpbot image ...
+echo --------------------------
+if [ "$1" = "--rebuild" ]; then
+  docker build --no-cache -t bumpbot .
+else
+  docker build -t bumpbot .
+fi
+
+# run the bumpbot
+echo
+echo -------------------
+echo Running bumpbot ...
+echo -------------------
+docker run --link bumpbot-redis:redis -v "$HOME:/home/lita" -v "$(dirname "$(pwd)"):/opt/bumpbot" --name bumpbot -it bumpbot

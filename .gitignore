@@ -9,6 +9,7 @@ _yardoc
 coverage
 doc/
 lib/bundler/man
+binstubs/
 pkg
 rdoc
 spec/reports
@@ -16,5 +17,10 @@ test/tmp
 test/version_tmp
 tmp
 
+docker/ngrok
+docker/ngrok*.zip
+docker/ngrok.log
+
 cache/
 lita_config.rb
+ngrok.yml
