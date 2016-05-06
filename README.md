@@ -1,8 +1,8 @@
 # lita-versioner
 
-[![Build Status](https://travis-ci.org/sersut/lita-versioner.png?branch=master)](https://travis-ci.org/sersut/lita-versioner)
+[![Build Status](https://travis-ci.org/chef/lita-versioner.png?branch=master)](https://travis-ci.org/chef/lita-versioner)
 
-This plugin acts as a bridge between Github & Jenkins. When a pull request is merged in Github, `lita-versioner` automatically increases the version of the projects and triggers a Jenkins job.
+This plugin acts as a bridge between Github and Jenkins. When a pull request is merged in Github, `lita-versioner` automatically increases the version of the projects and triggers a Jenkins job.
 
 ## Configuration
 
@@ -38,17 +38,9 @@ Lita has great documentation. Read [this](http://docs.lita.io/plugin-authoring/)
    - `brew cask install dockertoolbox`
    - `docker-machine create default --driver virtualbox`
    - `eval $(docker-machine env default)` <-- you might want that in your .profile
-2. Copy `lita_config.rb.example` to `lita_config.rb` with this text:
-   ```ruby
-   Lita.configure do |config|
-     config.handlers.versioner.jenkins_username = "YOUR JENKINS USERNAME"
-     config.handlers.versioner.jenkins_api_token = "YOUR TOKEN FROM STEP 4"
-     config.robot.adapter = :shell
-     config.robot.log_level = :debug
-   end
-   ```
+2. Copy `lita_config.rb.example` to `lita_config.rb`.
 
-This will use your personal configuration.
+NOTE: this will let you work with github, but won't talk to Slack, Jenkins or receive Github notifications by default--see later configuration sections for those.
 
 ### Running Lita
 
@@ -80,7 +72,8 @@ To test that the bot can communicate on Slack, you need to set up the bot and jo
    - /invite @<YOUR USERNAME>-testbot
 3. Configure the bot locally.
    - Bring over the lita_config.rb.example slack configuration, inserting the token from step 1 and choosing a channel:
-     ```
+
+     ```ruby
      config.adapters.slack.token = "<MY API TOKEN>"
      config.adapters.slack.link_names = true
      config.adapters.slack.parse = "full"
@@ -96,13 +89,14 @@ Now when you start the bot, it should join!
 To test against Jenkins, you just need to add the correct tokens to the config file.
 
 1. Get your Jenkins API token by logging in to https://manhattan.ci.chef.co, clicking your name on the top right, and clicking Configure. Then click "Show API Token" and copy the values for the next step.
-2. Copy `lita_config.rb.example` to `lita_config.rb` with this text:
+2. Edit `lita_config.rb` to add the two jenkins lines below:
+
    ```ruby
    Lita.configure do |config|
+     # Add these two lines:
      config.handlers.versioner.jenkins_username = "YOUR JENKINS USERNAME"
-     config.handlers.versioner.jenkins_api_token = "YOUR TOKEN FROM STEP 4"
-     config.robot.adapter = :shell
-     config.robot.log_level = :debug
+     config.handlers.versioner.jenkins_api_token = "YOUR TOKEN FROM STEP 1"
+     ........
    end
    ```
 
@@ -114,7 +108,8 @@ To test github hooks, we're going to use ngrok:
 
 1. Log in to the [ngrok Auth tab](https://dashboard.ngrok.com/auth).
 2. Put your auth token in ``~/.ngrok2/ngrok.yml`:
-   ```
+
+   ```yaml
    authtoken: <YOUR AUTH TOKEN>
    ```
 3. `docker/run-ngrok`
