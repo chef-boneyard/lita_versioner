@@ -1,5 +1,5 @@
-require 'spec_helper'
-require 'lita/jenkins_http'
+require "spec_helper"
+require "lita/jenkins_http"
 
 RSpec.describe Lita::JenkinsHTTP do
 
@@ -97,7 +97,6 @@ RSpec.describe Lita::JenkinsHTTP do
 
       let!(:expected_request) { jenkins_http.request(http_method, path) }
 
-
       let(:response) do
         Net::HTTPResponse.send(:response_class, "200").new("1.1", "200", "OK").tap do |r|
           r.instance_variable_set(:@body, "{}")
@@ -132,7 +131,7 @@ RSpec.describe Lita::JenkinsHTTP do
       let(:parameters) do
         {
           "GIT_REF" => "v123.456.789",
-          "EXPIRE_CACHE" => false
+          "EXPIRE_CACHE" => false,
         }
       end
 
@@ -220,7 +219,6 @@ ERROR_MESSAGE
         end
 
       end
-
 
     end
   end

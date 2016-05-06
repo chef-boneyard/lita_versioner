@@ -4,7 +4,7 @@ require "lita/jenkins_http"
 module Lita
   class BuildInProgressDetector
 
-    PIPELINE_JOBS = %w[ build test ].freeze
+    PIPELINE_JOBS = %w{ build test }.freeze
 
     VERSION_BUMPER_GIT_REF = "auto_dependency_bump_test".freeze
 
@@ -43,7 +43,7 @@ module Lita
       json_data = data_for_build(job, build_number)
       build_data = FFI_Yajl::Parser.parse(json_data)
       build_params = build_data["actions"].find { |a| a.key?("parameters") }["parameters"]
-      git_ref = build_params.find {|p| p.key?("name") && p["name"] == "GIT_REF"}["value"]
+      git_ref = build_params.find { |p| p.key?("name") && p["name"] == "GIT_REF" }["value"]
       git_ref == VERSION_BUMPER_GIT_REF
     end
 

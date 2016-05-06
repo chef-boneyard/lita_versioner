@@ -46,13 +46,13 @@ describe Lita::Handlers::Versioner, lita_handler: true do
         req.headers["X-GitHub-Event"] = event_type
         req.params[:payload] = {
           repository: {
-            full_name: "chef/#{repository}"
+            full_name: "chef/#{repository}",
           },
           action: pull_request_action,
           pull_request: {
             merged: pull_request_merged,
-            url: "http://github.com/chef/#{repository}/pulls/2"
-          }
+            url: "http://github.com/chef/#{repository}/pulls/2",
+          },
         }.to_json
       end
     end

@@ -1,5 +1,5 @@
-require 'uri'
-require 'net/http'
+require "uri"
+require "net/http"
 
 module Lita
   class JenkinsHTTP
@@ -25,7 +25,7 @@ module Lita
       private
 
       def generate_error_string
-        error_string =<<-ERROR_MESSAGE
+        error_string = <<-ERROR_MESSAGE
 Jenkins API Request failed with #{cause.class}
 
 Request Data:
@@ -37,14 +37,14 @@ Request Data:
 ERROR_MESSAGE
         if http_exception?
           error_string << <<-HTTP_ERROR_INFO
-Exception:\n- #{cause.to_s}
+Exception:\n- #{cause}
 - Response Code: #{cause.response.code}
 - Response Body:
 #{cause.response.body}
 HTTP_ERROR_INFO
         else
           # probably a socket/network issue
-          error_string << "Exception:\n- #{cause.to_s}\n"
+          error_string << "Exception:\n- #{cause}\n"
         end
 
         error_string

@@ -87,7 +87,7 @@ module Lita
     end
 
     # checks if there are any modified files that are tracked by git
-    def has_modified_files?(compared_to_ref="HEAD")
+    def has_modified_files?(compared_to_ref = "HEAD")
       !run_command("git diff #{compared_to_ref}").stdout.strip.empty?
     end
 
@@ -132,7 +132,7 @@ module Lita
       raise CommandError, [
         "Error running command '#{command}':",
         "stdout: #{shellout.stdout}",
-        "stderr: #{shellout.stderr}"
+        "stderr: #{shellout.stderr}",
       ].join("\n") if shellout.error?
 
       shellout
