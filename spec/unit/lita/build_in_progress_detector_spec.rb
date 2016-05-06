@@ -1,5 +1,5 @@
-require 'spec_helper'
-require 'lita/build_in_progress_detector'
+require "spec_helper"
+require "lita/build_in_progress_detector"
 
 RSpec.describe Lita::BuildInProgressDetector do
 
@@ -102,7 +102,7 @@ RSpec.describe Lita::BuildInProgressDetector do
   end
 
   it "has a list of jobs to query for in-progress builds" do
-    expect(build_in_progress_detector.jenkins_jobs).to eq(%w[ chefdk-build chefdk-test ])
+    expect(build_in_progress_detector.jenkins_jobs).to eq(%w{ chefdk-build chefdk-test })
   end
 
   context "when connecting to jenkins" do

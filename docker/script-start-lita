@@ -1,0 +1,13 @@
+#!/bin/sh
+set -ex
+bundle install --without style
+
+set +x
+echo
+echo - Interact with the bot just as if you were in a room with "lita" on Slack:
+echo   - @lita help
+echo   - @lita bump
+echo - Type "docker exec bumpbot bash" to get a bash prompt as well as a lita prompt.
+echo
+set -x
+bundle exec lita

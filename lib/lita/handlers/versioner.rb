@@ -20,7 +20,7 @@ module Lita
 
       http.post "/github_handler", :github_handler
       route(/^build/, :build, command: true, help: {
-        "build PIPELINE <TAG>" => "Kicks off a build for PIPELINE with TAG. TAG default: master"
+        "build PIPELINE <TAG>" => "Kicks off a build for PIPELINE with TAG. TAG default: master",
       })
       route(/^git_test/, :git_test, command: true)
 
@@ -30,22 +30,22 @@ module Lita
           github_url: "git@github.com:chef/lita-test.git",
           version_bump_command: "bundle install && bundle exec rake version:bump_patch",
           version_show_command: "bundle exec rake version:show",
-          inform_channel: "engineering-services"
+          inform_channel: "engineering-services",
         },
         chef: {
           pipeline: "chef-trigger-release",
           github_url: "git@github.com:chef/chef.git",
           version_bump_command: "bundle install && bundle exec rake version:bump && git checkout .bundle/config",
           version_show_command: "bundle exec rake version:show",
-          inform_channel: "workflow-pool"
+          inform_channel: "workflow-pool",
         },
         chefdk: {
           pipeline: "chefdk-trigger-release",
           github_url: "git@github.com:chef/chef-dk.git",
           version_bump_command: "bundle install && bundle exec rake version:bump && git checkout .bundle/config",
           version_show_command: "bundle exec rake version:show",
-          inform_channel: "workflow-pool"
-        }
+          inform_channel: "workflow-pool",
+        },
       }
 
       def build(response)
@@ -100,7 +100,7 @@ module Lita
         log "Processing '#{event_type}' event for '#{repository}'."
 
         PROJECTS.each do |project, project_data|
-          if project_data[:github_url].match(/.*(\/|:)#{repository}.git/)
+          if project_data[:github_url] =~ /.*(\/|:)#{repository}.git/
             @project = project_data
             break
           end

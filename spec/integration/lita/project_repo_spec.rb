@@ -14,7 +14,7 @@ describe Lita::ProjectRepo do
     Lita::ProjectRepo.new({
       github_url: project_url,
       version_bump_command: version_bump_cmd,
-      version_show_command: version_show_cmd
+      version_show_command: version_show_cmd,
     })
   }
 

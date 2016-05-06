@@ -1,6 +1,6 @@
 require "json"
 require "uri"
-require 'fileutils'
+require "fileutils"
 require "lita/build_in_progress_detector"
 require "lita/dependency_update_builder"
 require "lita/project_repo"
@@ -41,7 +41,7 @@ module Lita
           version_bump_command: "bundle install && bundle exec rake version:bump && git checkout .bundle/config",
           version_show_command: "bundle exec rake version:show",
           dependency_update_command: "bundle install && bundle exec rake dependencies && git checkout .bundle/config",
-          inform_channel: "workflow-pool"
+          inform_channel: "workflow-pool",
         },
         chef: {
           pipeline: "chef-trigger-release",
@@ -49,8 +49,8 @@ module Lita
           version_bump_command: "bundle install && bundle exec rake version:bump && git checkout .bundle/config",
           version_show_command: "bundle exec rake version:show",
           dependency_update_command: "bundle install && bundle exec rake dependencies && git checkout .bundle/config",
-          inform_channel: "workflow-pool"
-        }
+          inform_channel: "workflow-pool",
+        },
       }
 
       def update_dependencies_from_command(response)
@@ -162,7 +162,7 @@ module Lita
         FileUtils.mkdir_p(parent_dir) unless File.exist?(parent_dir)
         FileUtils.touch(FAILURE_NOTIFICATION_RATE_LIMIT_FILE)
         message = "Attempted dependency update for #{project_name} failed.\nError was #{e.class.name}:" +
-          "\n```\n#{e.to_s}\n```"
+          "\n```\n#{e}\n```"
         inform(message, project_info)
       end
 
@@ -180,7 +180,6 @@ module Lita
         robot.send_message(inform_channel, message)
         true
       end
-
 
       def project_name_valid?(project_name)
         return false if project_name.nil?
