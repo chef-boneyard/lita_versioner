@@ -6,18 +6,18 @@ module Lita
 
     PIPELINE_JOBS = %w{ build test }.freeze
 
-    VERSION_BUMPER_GIT_REF = "auto_dependency_bump_test".freeze
-
-    JENKINS_ENDPOINT = "http://manhattan.ci.chef.co/".freeze
-
     attr_reader :pipeline
     attr_reader :jenkins_username
     attr_reader :jenkins_api_token
+    attr_reader :jenkins_endpoint
+    attr_reader :target_git_ref
 
-    def initialize(pipeline: nil, jenkins_username: nil, jenkins_api_token: nil)
+    def initialize(pipeline: nil, jenkins_username: nil, jenkins_api_token: nil, jenkins_endpoint: nil, target_git_ref: nil)
       @pipeline = pipeline
       @jenkins_username = jenkins_username
       @jenkins_api_token = jenkins_api_token
+      @jenkins_endpoint = jenkins_endpoint
+      @target_git_ref = target_git_ref
     end
 
     def jenkins_jobs
@@ -44,7 +44,7 @@ module Lita
       build_data = FFI_Yajl::Parser.parse(json_data)
       build_params = build_data["actions"].find { |a| a.key?("parameters") }["parameters"]
       git_ref = build_params.find { |p| p.key?("name") && p["name"] == "GIT_REF" }["value"]
-      git_ref == VERSION_BUMPER_GIT_REF
+      git_ref == target_git_ref
     end
 
     # @api private
@@ -71,7 +71,7 @@ module Lita
 
     # @api private
     def jenkins_api
-      JenkinsHTTP.new(base_uri: JENKINS_ENDPOINT, username: jenkins_username, api_token: jenkins_api_token)
+      JenkinsHTTP.new(base_uri: jenkins_endpoint, username: jenkins_username, api_token: jenkins_api_token)
     end
 
   end

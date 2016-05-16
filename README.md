@@ -13,7 +13,7 @@ This plugin acts as a bridge between Github and Jenkins. When a pull request is 
 
 ## Usage
 
-Update the `PROJECTS` defined in `Lita::Handlers::Versioner` with the required information. E.g:
+Update the `config :projects` defined in `lib/lita/handlers/versioner.rb` with the required information. E.g:
 
 ```
 harmony: {
@@ -58,6 +58,8 @@ Lita >
 ```
 
 From here you can interact with the bot just like on Slack. Type `@lita help` for a list of commands.
+Note that the default docker/run command mounts your home directory at the container's ~lita. Hence,
+lita will performs actions using your ssh credentials unless they are encrypted private keys.
 
 ### Testing Against Slack
 

@@ -14,25 +14,23 @@ module Lita
     # never work.
     QUIET_TIME_S = 24 * 60 * 60
 
-    attr_reader :repo_url
+    attr_reader :handler
     attr_reader :dependency_branch
-    attr_reader :dependency_update_command
 
-    def initialize(repo_url:, dependency_branch:, dependency_update_command:)
-      @repo_url = repo_url
+    def initialize(handler:, dependency_branch:)
+      @handler = handler
       @dependency_branch = dependency_branch
-      @dependency_update_command = dependency_update_command
     end
 
     def project_repo
-      @repo ||= ProjectRepo.new(github_url: repo_url, dependency_update_command: dependency_update_command)
+      @repo ||= ProjectRepo.new(handler)
     end
 
     def run
       synchronize_repo
       if dependency_updates_disabled?
         message = "dependency updates disabled, skipping"
-        Lita.logger.info(message)
+        handler.info(message)
         return [ false, message ]
       end
 
@@ -40,13 +38,13 @@ module Lita
 
       unless dependencies_updated?
         message = "dependencies on master are up to date"
-        Lita.logger.info(message)
+        handler.info(message)
         return [ false, message ]
       end
 
       unless should_submit_changes_for_build?
         message = "dependency changes failed a previous build. waiting for the quiet period to expire before building again"
-        Lita.logger.info(message)
+        handler.info(message)
         return [ false, message ]
       end
 
