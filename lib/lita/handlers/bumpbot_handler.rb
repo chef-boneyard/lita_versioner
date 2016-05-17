@@ -99,7 +99,7 @@ module Lita
         end
 
         jenkins = JenkinsHTTP.new(base_uri: config.jenkins_endpoint,
-                                  usernme: config.jenkins_username,
+                                  username: config.jenkins_username,
                                   api_token: config.jenkins_api_token)
 
         begin
@@ -108,7 +108,7 @@ module Lita
             "EXPIRE_CACHE" => false,
             "INITIATED_BY" => response ? response.user.mention_name : "BumpBot"
           )
-        rescue JenkinsHTTPError => e
+        rescue JenkinsHTTP::JenkinsHTTPError => e
           error("Sorry, received HTTP error when kicking off the build!\n#{e}")
           return false
         end
