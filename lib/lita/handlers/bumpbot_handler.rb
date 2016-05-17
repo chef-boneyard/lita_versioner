@@ -64,16 +64,14 @@ module Lita
       # @return whatever the provided block returns.
       #
       def handle_event(title)
-        begin
-          init_event(title)
-          yield
-        rescue ErrorAlreadyReported
-          raise
-        rescue
-          msg = "Unhandled error while working on \"#{title}\":\n" +
-            "```#{$!}\n#{$!.backtrace.join("\n")}"
-          error(msg)
-        end
+        init_event(title)
+        yield
+      rescue ErrorAlreadyReported
+        error("Aborting message handler \"#{title}\" due to previously raised error")
+      rescue
+        msg = "Unhandled error while working on \"#{title}\":\n" +
+          "```#{$!}\n#{$!.backtrace.join("\n")}"
+        error(msg)
       end
 
       def run_command(command, timeout: 3600, **options)
@@ -93,11 +91,12 @@ module Lita
       # Trigger a Jenkins build on the given git ref.
       #
       def trigger_build(pipeline, git_ref)
+        debug("Kicking off a build for #{pipeline} at ref #{git_ref}.")
+
         unless config.trigger_real_builds
           warn("Would have triggered a build, but config.trigger_real_builds is false.")
-          return false
+          return true
         end
-        debug("Kicking off a build for #{pipeline} at ref #{git_ref}.")
 
         jenkins = JenkinsHTTP.new(base_uri: config.jenkins_endpoint,
                                   usernme: config.jenkins_username,

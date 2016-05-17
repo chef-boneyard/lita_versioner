@@ -1,4 +1,4 @@
-#require "lita-slack"
+require "lita-slack"
 
 Lita.configure do |config|
   config.redis[:host] = "redis"
@@ -47,6 +47,7 @@ Lita.configure do |config|
       github_url: "git@github.com:chef/chef-dk.git",
       version_bump_command: "bundle install && bundle exec rake version:bump && git checkout .bundle/config",
       version_show_command: "bundle exec rake version:show",
+      dependency_update_command: "bundle install && bundle exec rake dependencies && git checkout .bundle/config",
       inform_channel: "workflow-pool",
     },
     "harmony" => {

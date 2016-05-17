@@ -2,23 +2,42 @@ require "spec_helper"
 require "tmpdir"
 require "fileutils"
 
-require "lita/project_repo"
+describe Lita::ProjectRepo, lita: true do
 
-describe Lita::ProjectRepo do
   let(:tmpdir) { Dir.mktmpdir }
   let(:project_name) { "lita-versioner" }
   let(:project_url) { "https://github.com/chef/#{project_name}.git" }
   let(:version_bump_cmd) { nil }
   let(:version_show_cmd) { nil }
-  let(:project_repo) {
-    Lita::ProjectRepo.new({
-      github_url: project_url,
-      version_bump_command: version_bump_cmd,
-      version_show_command: version_show_cmd,
-    })
-  }
+
+  let(:robot) { Lita::Robot.new(registry) }
+  let(:handler) do
+    Lita::Handlers::BumpbotHandler.new(robot).tap do |h|
+      h.project_name = project_name
+      h.send(:init_event, "test")
+    end
+  end
+  let(:project_repo) { Lita::ProjectRepo.new(handler) }
 
   before do
+    registry.register_handler(Lita::Handlers::BumpbotHandler)
+    registry.register_adapter(:test, Lita::Adapters::Test)
+    registry.config.robot.adapter = :test
+    registry.configure do |c|
+      c.handlers.versioner.jenkins_username = "our_jenkins_user"
+      c.handlers.versioner.jenkins_api_token = "our_jenkins_api_token"
+      c.handlers.versioner.projects = {
+        project_name => {
+          pipeline: "our_pipeline",
+          github_url: project_url,
+          version_bump_command: version_bump_cmd,
+          version_show_command: version_show_cmd,
+          dependency_update_command: "",
+          inform_channel: "our_channel",
+        },
+      }
+    end
+
     @current_pwd = Dir.pwd
     Dir.chdir(tmpdir)
   end
@@ -68,7 +87,7 @@ describe Lita::ProjectRepo do
         original_run_command.call(command)
       end
 
-      Dir.mkdir(project_repo.repo_directory)
+      FileUtils.mkdir_p(project_repo.repo_directory)
       FileUtils.touch(version_file)
       File.open(version_file, "w+") do |f|
         f.puts "1.1.0"
@@ -80,7 +99,7 @@ describe Lita::ProjectRepo do
       project_repo.bump_version
       project_repo.tag_and_commit
       expect(File.read(version_file)).to match /1.1.1/
-      expect(project_repo.run_command("git log").stdout).to match /Automatic version bump for lita-versioner by lita-versioner./
+      expect(project_repo.run_command("git log").stdout).to match /Bump version of lita-versioner/
       expect(project_repo.run_command("git describe --tags").stdout.chomp).to eq("v1.1.1")
     end
   end
