@@ -8,24 +8,28 @@ module Lita
 
     CACHE_DIRECTORY = "./cache"
 
+    attr_reader :handler
     attr_reader :github_url
     attr_reader :version_bump_command
     attr_reader :version_show_command
     attr_reader :dependency_update_command
 
-    def initialize(project)
+    def initialize(handler)
+      @handler = handler
       @github_url = project[:github_url]
       @version_bump_command = project[:version_bump_command]
       @version_show_command = project[:version_show_command]
       @dependency_update_command = project[:dependency_update_command]
     end
 
+    def project
+      handler.project
+    end
+
     def bump_version
       return if version_bump_command.nil?
 
-      Bundler.with_clean_env do
-        run_command(version_bump_command)
-      end
+      run_command(version_bump_command)
     end
 
     def update_dependencies
@@ -34,17 +38,13 @@ module Lita
           "Can not update deps for project '#{github_url}'; no dependency_update_command provided to initializer."
       end
 
-      Bundler.with_clean_env do
-        run_command(dependency_update_command)
-      end
+      run_command(dependency_update_command)
     end
 
     def read_version
       raise CommandError, "Can not read the version for project '#{github_url}'." if version_show_command.nil?
 
-      Bundler.with_clean_env do
-        run_command(version_show_command).stdout.chomp
-      end
+      run_command(version_show_command).stdout.chomp
     end
 
     def tag_and_commit
@@ -57,7 +57,7 @@ module Lita
       run_command("git tag -a v#{version} -m \"Version tag for #{version}.\"")
       begin
         run_command("git push origin master --tags")
-      rescue CommandError => e
+      rescue Mixlib::ShellOut::ShellCommandFailed => e
         # We need to cleanup the local tag we have created if the push has failed.
         run_command("git tag -d v#{version}")
         raise e
@@ -94,14 +94,14 @@ module Lita
     def branch_exists?(branch_name)
       run_command("git rev-parse --verify #{branch_name}")
       true
-    rescue CommandError
+    rescue Mixlib::ShellOut::ShellCommandFailed
       false
     end
 
     def delete_branch(branch_name)
       run_command("git branch -D #{branch_name}")
       true
-    rescue CommandError
+    rescue Mixlib::ShellOut::ShellCommandFailed
       false
     end
 
@@ -117,25 +117,7 @@ module Lita
     end
 
     def run_command(command, cwd: repo_directory)
-      Lita.logger.info("Running command: '#{command}'")
-
-      opts = {
-        cwd: cwd,
-        timeout: 3600,
-      }
-
-      opts[:live_stream] = $stdout if Lita.logger.debug?
-
-      shellout = Mixlib::ShellOut.new(command, opts)
-      shellout.run_command
-
-      raise CommandError, [
-        "Error running command '#{command}':",
-        "stdout: #{shellout.stdout}",
-        "stderr: #{shellout.stderr}",
-      ].join("\n") if shellout.error?
-
-      shellout
+      handler.run_command(command, cwd: cwd)
     end
 
     def repo_directory

@@ -1,4 +1,19 @@
+require "lita-slack"
+
 Lita.configure do |config|
+  config.redis[:host] = "redis"
+
+  # Shell config: local config.
+  config.robot.adapter = :shell
+
+  # Slack config.
+  # config.robot.adapter = :slack
+  # config.adapters.slack.token = "<SLACK TOKEN HERE>"
+
+  config.robot.log_level = :debug
+
+
+  # Global BumpBot configuration.
   # To get your API token:
   # 1. Go to jenkins and log in.
   # 2. Click your name on the top right
@@ -7,9 +22,7 @@ Lita.configure do |config|
   config.handlers.versioner.jenkins_username = "YOU"
   config.handlers.versioner.jenkins_api_token = "00000ffff"
 
-  config.redis[:host] = "redis"
-
-  # If set to `false`, polling is disabled entirely
+  # If set to `false`, polling is disabled entirely.
   # Otherwise, it is the number of seconds between automatic dependency bump
   # attempts.
   config.handlers.versioner.polling_interval = false
@@ -19,13 +32,31 @@ Lita.configure do |config|
   # log a message instead of triggering a build.
   config.handlers.versioner.trigger_real_builds = false
 
-  # Shell config: local config.
-  config.robot.adapter = :shell
-
-  # Slack config.
-  # config.robot.adapter = :slack
-  # config.adapters.slack.token = "<SLACK TOKEN HERE>"
-  # config.handlers.versioner.default_inform_channel = "#workflow-pool"
-
-  config.robot.log_level = :debug
+  # Master list of all projects that BumpBot understands.
+  config.handlers.versioner.projects = {
+    "chef" => {
+      pipeline: "chef-trigger-release",
+      github_url: "git@github.com:chef/chef.git",
+      version_bump_command: "bundle install && bundle exec rake version:bump && git checkout .bundle/config",
+      version_show_command: "bundle exec rake version:show",
+      dependency_update_command: "bundle install && bundle exec rake dependencies && git checkout .bundle/config",
+      inform_channel: "workflow-pool",
+    },
+    "chefdk" => {
+      pipeline: "chefdk-trigger-release",
+      github_url: "git@github.com:chef/chef-dk.git",
+      version_bump_command: "bundle install && bundle exec rake version:bump && git checkout .bundle/config",
+      version_show_command: "bundle exec rake version:show",
+      dependency_update_command: "bundle install && bundle exec rake dependencies && git checkout .bundle/config",
+      inform_channel: "workflow-pool",
+    },
+    "harmony" => {
+      pipeline: "harmony-trigger-ad_hoc",
+      github_url: "git@github.com:chef/lita-test.git",
+      version_bump_command: "bundle install && bundle exec rake version:bump_patch",
+      version_show_command: "bundle exec rake version:show",
+      dependency_update_command: "bundle install && bundle exec rake dependencies && git checkout .bundle/config",
+      inform_channel: "eng-services-notify",
+    },
+  }
 end

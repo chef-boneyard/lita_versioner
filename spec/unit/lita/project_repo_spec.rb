@@ -11,7 +11,7 @@ RSpec.describe Lita::ProjectRepo do
 
   let(:dependency_update_command) { "bundle install && bundle exec rake dependencies" }
 
-  let(:project_options) do
+  let(:project) do
     {
       github_url: git_url,
       version_show_command: version_show_command,
@@ -20,19 +20,19 @@ RSpec.describe Lita::ProjectRepo do
     }
   end
 
-  let(:logger) do
-    double("Logger").tap do |l|
+  let(:handler) do
+    double("Lita::Handlers::BumpbotHandler").tap do |l|
       allow(l).to receive(:info)
-      allow(l).to receive(:debug?).and_return(false)
+      allow(l).to receive(:project).and_return(project)
     end
   end
 
-  subject(:project_repo) do
-    described_class.new(project_options)
+  def good_shellout
+    double("Mixlib::ShellOut", error?: false)
   end
 
-  before do
-    allow(Lita).to receive(:logger).and_return(logger)
+  subject(:project_repo) do
+    described_class.new(handler)
   end
 
   it "has a project repo" do
@@ -64,13 +64,10 @@ RSpec.describe Lita::ProjectRepo do
 
     context "when the repo isn't cloned" do
 
-      let(:clone_shellout) { double("Mixlib::ShellOut", error?: false) }
-
       it "clones the repo" do
-        expect(Mixlib::ShellOut).to receive(:new).
-          with("git clone git@github.com:chef/omnibus-harmony.git", cwd: "./cache", timeout: 3600).
-          and_return(clone_shellout)
-        expect(clone_shellout).to receive(:run_command)
+        expect(handler).to receive(:run_command).
+          with("git clone git@github.com:chef/omnibus-harmony.git", cwd: "./cache").
+          and_return(good_shellout)
         project_repo.refresh
       end
 
@@ -78,35 +75,26 @@ RSpec.describe Lita::ProjectRepo do
 
     context "when the repo is cloned" do
 
-      let(:fetch_shellout) { double("Mixlib::ShellOut", error?: false) }
-      let(:checkout_shellout) { double("Mixlib::ShellOut", error?: false) }
-      let(:reset_shellout) { double("Mixlib::ShellOut", error?: false) }
-      let(:clean_shellout) { double("Mixlib::ShellOut", error?: false) }
-
       before do
         allow(Dir).to receive(:exists?).with(project_repo.repo_directory).and_return(true)
       end
 
       it "fetches updates, cleans and resets to the current master" do
-        expect(Mixlib::ShellOut).to receive(:new).
-          with("git fetch origin", cwd: "./cache/omnibus-harmony", timeout: 3600).
-          and_return(fetch_shellout)
-        expect(fetch_shellout).to receive(:run_command)
+        expect(handler).to receive(:run_command).
+          with("git fetch origin", cwd: "./cache/omnibus-harmony").
+          and_return(good_shellout)
 
-        expect(Mixlib::ShellOut).to receive(:new).
-          with("git checkout -f master", cwd: "./cache/omnibus-harmony", timeout: 3600).
-          and_return(checkout_shellout)
-        expect(checkout_shellout).to receive(:run_command)
+        expect(handler).to receive(:run_command).
+          with("git checkout -f master", cwd: "./cache/omnibus-harmony").
+          and_return(good_shellout)
 
-        expect(Mixlib::ShellOut).to receive(:new).
-          with("git reset --hard origin/master", cwd: "./cache/omnibus-harmony", timeout: 3600).
-          and_return(fetch_shellout)
-        expect(fetch_shellout).to receive(:run_command)
+        expect(handler).to receive(:run_command).
+          with("git reset --hard origin/master", cwd: "./cache/omnibus-harmony").
+          and_return(good_shellout)
 
-        expect(Mixlib::ShellOut).to receive(:new).
-          with("git clean -fdx", cwd: "./cache/omnibus-harmony", timeout: 3600).
-          and_return(clean_shellout)
-        expect(clean_shellout).to receive(:run_command)
+        expect(handler).to receive(:run_command).
+          with("git clean -fdx", cwd: "./cache/omnibus-harmony").
+          and_return(good_shellout)
 
         project_repo.refresh
       end
@@ -117,13 +105,10 @@ RSpec.describe Lita::ProjectRepo do
 
   describe "update dependencies" do
 
-    let(:dep_update_shellout) { double("Mixlib::ShellOut", error?: false) }
-
     it "runs the version bump command" do
-      expect(Mixlib::ShellOut).to receive(:new).
-        with(dependency_update_command, cwd: "./cache/omnibus-harmony", timeout: 3600).
-        and_return(dep_update_shellout)
-      expect(dep_update_shellout).to receive(:run_command)
+      expect(handler).to receive(:run_command).
+        with(dependency_update_command, cwd: "./cache/omnibus-harmony").
+        and_return(good_shellout)
 
       project_repo.update_dependencies
     end
@@ -131,13 +116,10 @@ RSpec.describe Lita::ProjectRepo do
 
   describe "bump version" do
 
-    let(:bump_shellout) { double("Mixlib::ShellOut", error?: false) }
-
     it "runs the version bump command" do
-      expect(Mixlib::ShellOut).to receive(:new).
-        with(version_bump_command, cwd: "./cache/omnibus-harmony", timeout: 3600).
-        and_return(bump_shellout)
-      expect(bump_shellout).to receive(:run_command)
+      expect(handler).to receive(:run_command).
+        with(version_bump_command, cwd: "./cache/omnibus-harmony").
+        and_return(good_shellout)
 
       project_repo.bump_version
     end
@@ -147,31 +129,23 @@ RSpec.describe Lita::ProjectRepo do
 
     let(:version) { "12.34.56\n" }
 
-    let(:config_email_shellout) { double("Mixlib::ShellOut", error?: false) }
-    let(:config_user_shellout) { double("Mixlib::ShellOut", error?: false) }
-    let(:git_add_shellout) { double("Mixlib::ShellOut", error?: false) }
-    let(:git_commit_shellout) { double("Mixlib::ShellOut", error?: false) }
-    let(:git_tag_shellout) { double("Mixlib::ShellOut", error?: false) }
-    let(:git_push_shellout) { double("Mixlib::ShellOut", error?: false) }
-
     let(:config_check_shellout) { double("Mixlib::ShellOut", error?: false, stdout: "") }
     let(:version_read_shellout) { double("Mixlib::ShellOut", error?: false, stdout: version) }
 
     it "configures committer info, commits, tags and pushes" do
       [
         [ "git config -l", config_check_shellout ],
-        [ "git config user.email \"chef-versioner@chef.io\"", config_email_shellout ],
-        [ "git config user.name \"Chef Versioner\"", config_user_shellout ],
-        [ "git add -A", git_add_shellout ],
-        [ "git commit -m \"Bump version of omnibus-harmony to 12.34.56 by Chef Versioner.\"", git_commit_shellout ],
+        [ "git config user.email \"chef-versioner@chef.io\"", good_shellout ],
+        [ "git config user.name \"Chef Versioner\"", good_shellout ],
+        [ "git add -A", good_shellout ],
+        [ "git commit -m \"Bump version of omnibus-harmony to 12.34.56 by Chef Versioner.\"", good_shellout ],
         [ version_show_command, version_read_shellout ],
-        [ "git tag -a v12.34.56 -m \"Version tag for 12.34.56.\"", git_tag_shellout ],
-        [ "git push origin master --tags", git_push_shellout ],
+        [ "git tag -a v12.34.56 -m \"Version tag for 12.34.56.\"", good_shellout ],
+        [ "git push origin master --tags", good_shellout ],
       ].each do |command_string, shellout_object|
-        expect(Mixlib::ShellOut).to receive(:new).
-          with(command_string, cwd: "./cache/omnibus-harmony", timeout: 3600).
+        expect(handler).to receive(:run_command).
+          with(command_string, cwd: "./cache/omnibus-harmony").
           and_return(shellout_object)
-        expect(shellout_object).to receive(:run_command)
       end
 
       project_repo.tag_and_commit
@@ -182,27 +156,19 @@ RSpec.describe Lita::ProjectRepo do
 
     let(:config_check_shellout) { double("Mixlib::ShellOut", error?: false, stdout: "") }
 
-    let(:config_email_shellout) { double("Mixlib::ShellOut", error?: false) }
-    let(:config_user_shellout) { double("Mixlib::ShellOut", error?: false) }
-    let(:git_checkout_shellout) { double("Mixlib::ShellOut", error?: false) }
-    let(:git_add_shellout) { double("Mixlib::ShellOut", error?: false) }
-    let(:git_commit_shellout) { double("Mixlib::ShellOut", error?: false) }
-    let(:git_push_shellout) { double("Mixlib::ShellOut", error?: false) }
-
     it "configures committer info, commits to a branch and force-pushes the branch" do
       [
         [ "git config -l", config_check_shellout ],
-        [ "git config user.email \"chef-versioner@chef.io\"", config_email_shellout ],
-        [ "git config user.name \"Chef Versioner\"", config_user_shellout ],
-        [ "git checkout -B auto_dependency_bump_test", git_checkout_shellout ],
-        [ "git add -A", git_add_shellout ],
-        [ "git commit -m \"Automatic dependency update by Chef Versioner\"", git_commit_shellout ],
-        [ "git push origin auto_dependency_bump_test --force", git_push_shellout ],
+        [ "git config user.email \"chef-versioner@chef.io\"", good_shellout ],
+        [ "git config user.name \"Chef Versioner\"", good_shellout ],
+        [ "git checkout -B auto_dependency_bump_test", good_shellout ],
+        [ "git add -A", good_shellout ],
+        [ "git commit -m \"Automatic dependency update by Chef Versioner\"", good_shellout ],
+        [ "git push origin auto_dependency_bump_test --force", good_shellout ],
       ].each do |command_string, shellout_object|
-        expect(Mixlib::ShellOut).to receive(:new).
-          with(command_string, cwd: "./cache/omnibus-harmony", timeout: 3600).
+        expect(handler).to receive(:run_command).
+          with(command_string, cwd: "./cache/omnibus-harmony").
           and_return(shellout_object)
-        expect(shellout_object).to receive(:run_command)
       end
 
       project_repo.force_commit_to_branch("auto_dependency_bump_test")
@@ -216,10 +182,9 @@ RSpec.describe Lita::ProjectRepo do
     let(:diff_target) { "HEAD" }
 
     before do
-      expect(Mixlib::ShellOut).to receive(:new).
-             with("git diff #{diff_target}", cwd: "./cache/omnibus-harmony", timeout: 3600).
-             and_return(diff_index_shellout)
-      expect(diff_index_shellout).to receive(:run_command)
+      expect(handler).to receive(:run_command).
+        with("git diff #{diff_target}", cwd: "./cache/omnibus-harmony").
+        and_return(diff_index_shellout)
     end
 
     context "when there are no changes" do
@@ -292,61 +257,40 @@ RSpec.describe Lita::ProjectRepo do
 
   describe "branch exists?" do
 
-    before do
-      expect(Mixlib::ShellOut).to receive(:new).
-        with("git rev-parse --verify auto_dependency_bump_test", cwd: "./cache/omnibus-harmony", timeout: 3600).
-        and_return(git_rev_parse_shellout)
-      expect(git_rev_parse_shellout).to receive(:run_command)
+    it "returns true when the branch exists" do
+      expect(handler).to receive(:run_command).
+        with("git rev-parse --verify auto_dependency_bump_test", cwd: "./cache/omnibus-harmony").
+        and_return(good_shellout)
+
+      expect(project_repo.branch_exists?("auto_dependency_bump_test")).to be(true)
     end
 
-    context "when the branch exists" do
+    it "returns false when the branch doesn't exist" do
+      expect(handler).to receive(:run_command).
+        with("git rev-parse --verify auto_dependency_bump_test", cwd: "./cache/omnibus-harmony").
+        and_raise(Mixlib::ShellOut::ShellCommandFailed)
 
-      let(:git_rev_parse_shellout) { double("Mixlib::ShellOut", error?: false) }
-
-      it "returns true" do
-        expect(project_repo.branch_exists?("auto_dependency_bump_test")).to be(true)
-      end
-
+      expect(project_repo.branch_exists?("auto_dependency_bump_test")).to be(false)
     end
 
-    context "when the branch doesn't exist" do
-
-      let(:git_rev_parse_shellout) { double("Mixlib::ShellOut", error?: true, stdout: "", stderr: "fatal: Needed a single revision") }
-
-      it "returns false" do
-        expect(project_repo.branch_exists?("auto_dependency_bump_test")).to be(false)
-      end
-
-    end
   end
 
   describe "deleting a branch" do
 
-    before do
-      expect(Mixlib::ShellOut).to receive(:new).
-        with("git branch -D auto_dependency_bump_test", cwd: "./cache/omnibus-harmony", timeout: 3600).
-        and_return(git_branch_shellout)
-      expect(git_branch_shellout).to receive(:run_command)
+    it "removes the branch when the branch exists" do
+      expect(handler).to receive(:run_command).
+        with("git branch -D auto_dependency_bump_test", cwd: "./cache/omnibus-harmony").
+        and_return(good_shellout)
+
+      expect(project_repo.delete_branch("auto_dependency_bump_test")).to be(true)
     end
 
-    context "when the branch exists" do
+    it "doesn't error when the branch doesn't exist" do
+      expect(handler).to receive(:run_command).
+        with("git branch -D auto_dependency_bump_test", cwd: "./cache/omnibus-harmony").
+        and_raise(Mixlib::ShellOut::ShellCommandFailed)
 
-      let(:git_branch_shellout) { double("Mixlib::ShellOut", error?: false) }
-
-      it "removes the branch" do
-        expect(project_repo.delete_branch("auto_dependency_bump_test")).to be(true)
-      end
-
-    end
-
-    context "when the branch doesn't exist" do
-
-      let(:git_branch_shellout) { double("Mixlib::ShellOut", error?: true, stdout: "", stderr: "fatal: Needed a single revision") }
-
-      it "doesn't error" do
-        expect(project_repo.delete_branch("auto_dependency_bump_test")).to be(false)
-      end
-
+      expect(project_repo.delete_branch("auto_dependency_bump_test")).to be(false)
     end
 
   end
@@ -360,10 +304,9 @@ RSpec.describe Lita::ProjectRepo do
     let(:now) { Time.at(1459816660) }
 
     before do
-      expect(Mixlib::ShellOut).to receive(:new).
-        with("git show -s --format=\"%ct\" auto_dependency_bump_test", cwd: "./cache/omnibus-harmony", timeout: 3600).
+      expect(handler).to receive(:run_command).
+        with("git show -s --format=\"%ct\" auto_dependency_bump_test", cwd: "./cache/omnibus-harmony").
         and_return(git_show_shellout)
-      expect(git_show_shellout).to receive(:run_command)
 
       expect(Time).to receive(:new).and_return(now)
     end

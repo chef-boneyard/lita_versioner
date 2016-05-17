@@ -1,38 +1,52 @@
 require "spec_helper"
 
-describe Lita::Handlers::Versioner, lita_handler: true do
+describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers: Lita::Handlers::BumpbotHandler do
   before do
     Lita.config.handlers.versioner.jenkins_username = "ci"
     Lita.config.handlers.versioner.jenkins_api_token = "ci_api_token"
+    Lita.config.handlers.versioner.trigger_real_builds = false
+    Lita.config.handlers.versioner.projects = {
+      "harmony" => {
+        pipeline: "harmony-trigger-ad_hoc",
+        github_url: "git@github.com:chef/lita-test.git",
+        version_bump_command: "bundle install && bundle exec rake version:bump_patch",
+        version_show_command: "bundle exec rake version:show",
+        dependency_update_command: "bundle install && bundle exec rake dependencies && git checkout .bundle/config",
+        inform_channel: "eng-services-notify",
+      },
+    }
   end
 
-  it { is_expected.to route_command("build harmony").to(:build) }
+  # We override route() - therefore, the matcher doesn't work correctly.
+  #it { is_expected.to route_command("build harmony").to(:build) }
   it { is_expected.to route_http(:post, "/github_handler").to(:github_handler) }
 
   it "does not build without project name" do
-    expect(subject).not_to receive(:trigger_build)
     send_command("build")
-    expect(replies.last).to match(/Argument issue./)
+    expect(replies[-2]).to match(/No project specified/)
   end
 
   it "does not build unsupported projects" do
-    expect(subject).not_to receive(:trigger_build)
     send_command("build chef")
-    expect(replies.last).to match(/Project 'chef' is not supported./)
+    expect(replies[-2]).to match(/Invalid project/)
   end
 
   it "builds with master by default" do
-    # lita-rspec is doing something with subject therefore we need expect_any_instance_of here.
+    # The robot creates a new instance of the handler on the fly.
+    # So we need this stupid hack to set expectations on any handler it creates.
     expect_any_instance_of(Lita::Handlers::Versioner).to receive(:trigger_build)
-      .with("master").and_return(true)
+      .with("harmony-trigger-ad_hoc", "master").and_return(true)
     send_command("build harmony")
+    expect(replies.last).to match(/Kicked off a build for 'harmony-trigger-ad_hoc' at ref 'master'/)
   end
 
   it "builds with the specified tag" do
-    # lita-rspec is doing something with subject therefore we need expect_any_instance_of here.
+    # The robot creates a new instance of the handler on the fly.
+    # So we need this stupid hack to set expectations on any handler it creates.
     expect_any_instance_of(Lita::Handlers::Versioner).to receive(:trigger_build)
-      .with("example").and_return(true)
+      .with("harmony-trigger-ad_hoc", "example").and_return(true)
     send_command("build harmony example")
+    expect(replies.last).to match(/Kicked off a build for 'harmony-trigger-ad_hoc' at ref 'example'/)
   end
 
   context "github handler" do

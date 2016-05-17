@@ -3,221 +3,204 @@ require "lita/dependency_update_builder"
 
 RSpec.describe Lita::DependencyUpdateBuilder do
 
-  let(:repo_url) { "git@github.com:chef/omnibus-harmony.git" }
-
-  let(:dependency_bump_command) { "rake dependencies" }
-
   let(:dependency_branch) { "auto_dependency_bump_test" }
 
-  let(:dependency_update_command) { "bundle install && bundle exec rake dependencies" }
-
-  subject(:dependency_update_builder) do
-    described_class.new(repo_url: repo_url, dependency_branch: dependency_branch, dependency_update_command: dependency_update_command)
-  end
-
-  let(:logger) do
-    double("Logger").tap do |l|
+  let(:handler) do
+    double("Lita::Handlers::BumpbotHandler").tap do |l|
       allow(l).to receive(:info)
     end
   end
 
+  let(:project_repo) { instance_double("Lita::ProjectRepo") }
+
+  subject(:dependency_update_builder) do
+    described_class.new(handler: handler, dependency_branch: dependency_branch)
+  end
+
   before do
-    allow(Lita).to receive(:logger).and_return(logger)
+    allow(dependency_update_builder).to receive(:project_repo).and_return(project_repo)
   end
 
-  it "has a project repo" do
-    expect(dependency_update_builder.project_repo.github_url).to eq(repo_url)
+  describe "synchronize_repo" do
+
+    it "refreshes the project repo" do
+      expect(project_repo).to receive(:refresh)
+      dependency_update_builder.synchronize_repo
+    end
+
   end
 
-  context "with a correctly configured project repo" do
-
-    let(:project_repo) { instance_double("Lita::ProjectRepo") }
+  context "when a 'don't bump deps' file is present" do
 
     before do
-      allow(dependency_update_builder).to receive(:project_repo).and_return(project_repo)
+      allow(project_repo).to receive(:has_file?).
+        with(".dependency_updates_disabled").
+        and_return(true)
     end
 
-    describe "synchronize_repo" do
+    it "indicates that dependency bumping should be skipped" do
+      expect(dependency_update_builder.dependency_updates_disabled?).to be(true)
+    end
 
-      it "refreshes the project repo" do
-        expect(project_repo).to receive(:refresh)
-        dependency_update_builder.synchronize_repo
+    it "does not run any dependency update or build steps" do
+      expect(project_repo).to receive(:refresh)
+      expect(dependency_update_builder.run).to eq([false, "dependency updates disabled, skipping"])
+    end
+
+  end
+
+  context "when no 'don't bump deps' file is present" do
+
+    before do
+      allow(project_repo).to receive(:has_file?).
+        with(".dependency_updates_disabled").
+        and_return(false)
+    end
+
+    describe "update_dependencies" do
+
+      it "runs the dependency update command" do
+        expect(project_repo).to receive(:update_dependencies)
+        dependency_update_builder.update_dependencies
       end
 
     end
 
-    context "when a 'don't bump deps' file is present" do
+    context "when no dependencies were updated" do
 
       before do
-        allow(project_repo).to receive(:has_file?).
-          with(".dependency_updates_disabled").
-          and_return(true)
-      end
-
-      it "indicates that dependency bumping should be skipped" do
-        expect(dependency_update_builder.dependency_updates_disabled?).to be(true)
-      end
-
-      it "does not run any dependency update or build steps" do
-        expect(project_repo).to receive(:refresh)
-        expect(dependency_update_builder.run).to eq([false, "dependency updates disabled, skipping"])
-      end
-
-    end
-
-    context "when no 'don't bump deps' file is present" do
-
-      before do
-        allow(project_repo).to receive(:has_file?).
-          with(".dependency_updates_disabled").
+        allow(project_repo).to receive(:has_modified_files?).
+          with(no_args).
           and_return(false)
       end
 
-      describe "update_dependencies" do
-
-        it "runs the dependency update command" do
-          expect(project_repo).to receive(:update_dependencies)
-          dependency_update_builder.update_dependencies
-        end
-
+      it "indicates that no deps were updated" do
+        expect(dependency_update_builder.dependencies_updated?).to be(false)
       end
 
-      context "when no dependencies were updated" do
+      it "doesn't create a branch or start a build" do
+        expect(project_repo).to receive(:refresh)
+        expect(project_repo).to receive(:update_dependencies)
+        expect(dependency_update_builder.run).to eq([false, "dependencies on master are up to date"])
+      end
+    end
+
+    context "when dependencies were updated" do
+
+      before do
+        allow(project_repo).to receive(:has_modified_files?).
+          with(no_args).
+          and_return(true)
+      end
+
+      it "indicates that deps were updated" do
+        expect(dependency_update_builder.dependencies_updated?).to be(true)
+      end
+
+      context "and there is no existing branch for dependency updates" do
 
         before do
-          allow(project_repo).to receive(:has_modified_files?).
-            with(no_args).
+          allow(project_repo).to receive(:branch_exists?).
+            with(dependency_branch).
             and_return(false)
         end
 
-        it "indicates that no deps were updated" do
-          expect(dependency_update_builder.dependencies_updated?).to be(false)
+        it "indicates that a build should be submitted" do
+          expect(dependency_update_builder.should_submit_changes_for_build?).to be(true)
         end
 
-        it "doesn't create a branch or start a build" do
-          expect(project_repo).to receive(:refresh)
-          expect(project_repo).to receive(:update_dependencies)
-          expect(dependency_update_builder.run).to eq([false, "dependencies on master are up to date"])
-        end
       end
 
-      context "when dependencies were updated" do
+      context "when the dependency update matches a previous build" do
 
         before do
-          allow(project_repo).to receive(:has_modified_files?).
-            with(no_args).
+          allow(project_repo).to receive(:branch_exists?).
+            with(dependency_branch).
             and_return(true)
+          allow(project_repo).to receive(:has_modified_files?).
+            with(dependency_branch).
+            and_return(false)
         end
 
-        it "indicates that deps were updated" do
-          expect(dependency_update_builder.dependencies_updated?).to be(true)
-        end
-
-        context "and there is no existing branch for dependency updates" do
+        context "and the previous build is not more than FAILED_BUILD_QUIET_TIME old" do
 
           before do
-            allow(project_repo).to receive(:branch_exists?).
-              with("auto_dependency_bump_test").
-              and_return(false)
+            allow(project_repo).to receive(:time_since_last_commit_on).
+              with(dependency_branch).
+              and_return(3600)
+          end
+
+          it "indicates that no build should be submitted" do
+            expect(dependency_update_builder.should_submit_changes_for_build?).to be(false)
+          end
+
+          it "should not submit the changes for a new build" do
+            expect(project_repo).to receive(:refresh)
+            expect(project_repo).to receive(:update_dependencies)
+            message = "dependency changes failed a previous build. waiting for the quiet period to expire before building again"
+            expect(dependency_update_builder.run).to eq([false, message])
+          end
+
+        end
+
+        context "but the previous build is more than FAILED_BUILD_QUIET_TIME old" do
+
+          before do
+            allow(project_repo).to receive(:time_since_last_commit_on).
+              with(dependency_branch).
+              and_return(3600 * 25)
           end
 
           it "indicates that a build should be submitted" do
             expect(dependency_update_builder.should_submit_changes_for_build?).to be(true)
           end
 
-        end
-
-        context "when the dependency update matches a previous build" do
-
-          before do
-            allow(project_repo).to receive(:branch_exists?).
-              with("auto_dependency_bump_test").
-              and_return(true)
-            allow(project_repo).to receive(:has_modified_files?).
-              with("auto_dependency_bump_test").
-              and_return(false)
-          end
-
-          context "and the previous build is not more than FAILED_BUILD_QUIET_TIME old" do
-
-            before do
-              allow(project_repo).to receive(:time_since_last_commit_on).
-                with("auto_dependency_bump_test").
-                and_return(3600)
-            end
-
-            it "indicates that no build should be submitted" do
-              expect(dependency_update_builder.should_submit_changes_for_build?).to be(false)
-            end
-
-            it "should not submit the changes for a new build" do
-              expect(project_repo).to receive(:refresh)
-              expect(project_repo).to receive(:update_dependencies)
-              message = "dependency changes failed a previous build. waiting for the quiet period to expire before building again"
-              expect(dependency_update_builder.run).to eq([false, message])
-            end
-
-          end
-
-          context "but the previous build is more than FAILED_BUILD_QUIET_TIME old" do
-
-            before do
-              allow(project_repo).to receive(:time_since_last_commit_on).
-                with("auto_dependency_bump_test").
-                and_return(3600 * 25)
-            end
-
-            it "indicates that a build should be submitted" do
-              expect(dependency_update_builder.should_submit_changes_for_build?).to be(true)
-            end
-
-            it "should submit the changes for a new build" do
-              expect(project_repo).to receive(:refresh)
-              expect(project_repo).to receive(:update_dependencies)
-              expect(dependency_update_builder).to receive(:push_changes_to_upstream)
-              expect(dependency_update_builder.run).to eq([true, "dependency updates pushed to auto_dependency_bump_test"])
-            end
-
-          end
-
-        end
-
-        context "when the dependency update does not match a previous build" do
-
-          before do
-            allow(project_repo).to receive(:branch_exists?).
-              with("auto_dependency_bump_test").
-              and_return(true)
-            allow(project_repo).to receive(:has_modified_files?).
-              with("auto_dependency_bump_test").
-              and_return(true)
-          end
-
-          it "indicates that a build should be submitted" do
-            expect(dependency_update_builder.should_submit_changes_for_build?).to be(true)
-          end
-
-          it "should submit the changes for new build" do
+          it "should submit the changes for a new build" do
             expect(project_repo).to receive(:refresh)
             expect(project_repo).to receive(:update_dependencies)
             expect(dependency_update_builder).to receive(:push_changes_to_upstream)
-            expect(dependency_update_builder.run).to eq([true, "dependency updates pushed to auto_dependency_bump_test"])
+            expect(dependency_update_builder.run).to eq([true, "dependency updates pushed to #{dependency_branch}"])
           end
 
         end
 
       end
 
-      describe "pushing changes to upstream" do
+      context "when the dependency update does not match a previous build" do
 
-        it "force commits to the dependency branch" do
-          expect(project_repo).to receive(:force_commit_to_branch).
-            with(dependency_branch)
-          dependency_update_builder.push_changes_to_upstream
+        before do
+          allow(project_repo).to receive(:branch_exists?).
+            with(dependency_branch).
+            and_return(true)
+          allow(project_repo).to receive(:has_modified_files?).
+            with(dependency_branch).
+            and_return(true)
+        end
+
+        it "indicates that a build should be submitted" do
+          expect(dependency_update_builder.should_submit_changes_for_build?).to be(true)
+        end
+
+        it "should submit the changes for new build" do
+          expect(project_repo).to receive(:refresh)
+          expect(project_repo).to receive(:update_dependencies)
+          expect(dependency_update_builder).to receive(:push_changes_to_upstream)
+          expect(dependency_update_builder.run).to eq([true, "dependency updates pushed to #{dependency_branch}"])
         end
 
       end
 
     end
+
+    describe "pushing changes to upstream" do
+
+      it "force commits to the dependency branch" do
+        expect(project_repo).to receive(:force_commit_to_branch).
+          with(dependency_branch)
+        dependency_update_builder.push_changes_to_upstream
+      end
+
+    end
+
   end
 end
