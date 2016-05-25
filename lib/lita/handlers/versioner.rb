@@ -39,10 +39,7 @@ module Lita
       def github_handler(request, response)
         handle_event "github event" do
           payload = JSON.parse(request.params["payload"])
-
-          event_type = request.env["HTTP_X_GITHUB_EVENT"]
           repository = payload["repository"]["full_name"]
-          info("Processing '#{event_type}' event for '#{repository}'.")
 
           self.project_name = projects.each_key.find do |name|
             projects[name][:github_url].match(/.*(\/|:)#{repository}.git/)
@@ -51,6 +48,10 @@ module Lita
           if project_name.nil?
             error!("Repository '#{repository}' is not monitored by versioner!")
           end
+
+          event_type = request.env["HTTP_X_GITHUB_EVENT"]
+
+          debug("Processing '#{event_type}' event for '#{repository}'.")
 
           case event_type
           when "pull_request"
@@ -67,7 +68,7 @@ module Lita
               debug("Skipping: '#{payload["pull_request"]["html_url"]}' Action: '#{payload["action"]}' Merged? '#{payload["pull_request"]["merged"]}'")
             end
           else
-            info("Skipping event '#{event_type}' for '#{repository}'. I am only handling 'pull_request' events.")
+            debug("Skipping event '#{event_type}' for '#{repository}'. I can only handle 'pull_request' events.")
           end
         end
       end
