@@ -77,11 +77,11 @@ module Lita
       def run_command(command, timeout: 3600, **options)
         Bundler.with_clean_env do
           options[:timeout] = timeout
-          options[:live_stream] = $stdout if Lita.logger.debug? && !options.has_key?(:live_stream)
 
           debug("Running \"#{command}\" with #{options}")
           shellout = Mixlib::ShellOut.new(command, options)
           shellout.run_command
+          debug("STDOUT:#{shellout.stdout}\nSTDERR:#{shellout.stderr}")
           shellout.error!
           shellout
         end
