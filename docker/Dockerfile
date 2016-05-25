@@ -3,7 +3,7 @@ MAINTAINER John Keiser <jkeiser@chef.io>
 
 # Set up the machine
 RUN apt-get -qq update
-RUN apt-get -qy install socat sudo git unzip
+RUN apt-get -qy --force-yes install socat sudo git unzip vim
 RUN sed -i.bkp -e 's/%sudo\s\+ALL=(ALL\(:ALL\)\?)\s\+ALL/%sudo ALL=NOPASSWD:ALL/g' /etc/sudoers
 
 # Install lita
