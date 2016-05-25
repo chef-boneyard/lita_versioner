@@ -8,7 +8,7 @@ module Lita
       config :jenkins_endpoint, default: "http://manhattan.ci.chef.co/"
       config :polling_interval, default: false
       config :trigger_real_builds, default: false
-      config :default_inform_channel, default: "eng-services-support"
+      config :default_inform_channel, default: "chef-notify"
       config :projects, default: {}
 
       namespace "versioner"

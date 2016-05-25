@@ -12,7 +12,7 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
         version_bump_command: "bundle install && bundle exec rake version:bump_patch",
         version_show_command: "bundle exec rake version:show",
         dependency_update_command: "bundle install && bundle exec rake dependencies && git checkout .bundle/config",
-        inform_channel: "eng-services-notify",
+        inform_channel: "chef-notify",
       },
     }
   end
