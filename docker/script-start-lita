@@ -1,4 +1,6 @@
 #!/bin/sh
+ssh git@github.com "echo hello"
+
 set -ex
 bundle install --without style
 
@@ -9,5 +11,6 @@ echo   - @lita help
 echo   - @lita bump
 echo - Type "docker exec bumpbot bash" to get a bash prompt as well as a lita prompt.
 echo
+
 set -x
 bundle exec lita

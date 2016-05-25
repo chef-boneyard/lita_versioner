@@ -25,3 +25,6 @@ docker/ngrok.log
 cache/
 lita_config.rb
 ngrok.yml
+
+# Redis database dumps
+dump.rdb
