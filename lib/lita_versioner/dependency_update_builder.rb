@@ -1,6 +1,6 @@
-require "lita/project_repo"
+require_relative "project_repo"
 
-module Lita
+module LitaVersioner
   class DependencyUpdateBuilder
 
     # This is the number of seconds to wait before re-submitting a build that

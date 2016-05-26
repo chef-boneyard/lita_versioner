@@ -1,10 +1,10 @@
+require "lita"
 require "json"
 require "uri"
 require "fileutils"
-require_relative "../build_in_progress_detector"
-require_relative "../dependency_update_builder"
-require_relative "../project_repo"
-require_relative "../jenkins_http"
+require_relative "../../lita_versioner/build_in_progress_detector"
+require_relative "../../lita_versioner/dependency_update_builder"
+require_relative "../../lita_versioner/project_repo"
 require_relative "bumpbot_handler"
 
 module Lita

@@ -1,6 +1,7 @@
+require "lita"
 require "json"
 require "uri"
-require_relative "../project_repo"
+require_relative "../../lita_versioner/project_repo"
 require_relative "bumpbot_handler"
 
 module Lita

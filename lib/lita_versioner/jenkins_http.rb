@@ -1,7 +1,7 @@
 require "uri"
 require "net/http"
 
-module Lita
+module LitaVersioner
   class JenkinsHTTP
 
     class JenkinsHTTPError < StandardError
