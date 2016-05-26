@@ -1,5 +1,5 @@
-require "lita-slack"
-
+# Uncomment the following lines once Slack tokens are added below
+# require "lita-slack"
 Lita.configure do |config|
   config.redis[:host] = "redis"
 
@@ -36,7 +36,7 @@ Lita.configure do |config|
   config.handlers.versioner.projects = {
     "chef" => {
       pipeline: "chef-trigger-release",
-      github_url: "git@github.com:chef/chef.git",
+      github_url: "https://github.com/chef/chef.git",
       version_bump_command: "bundle install && bundle exec rake version:bump && git checkout .bundle/config",
       version_show_command: "bundle exec rake version:show",
       dependency_update_command: "bundle install && bundle exec rake dependencies && git checkout .bundle/config",
@@ -44,7 +44,7 @@ Lita.configure do |config|
     },
     "chefdk" => {
       pipeline: "chefdk-trigger-release",
-      github_url: "git@github.com:chef/chef-dk.git",
+      github_url: "https://github.com/chef/chef-dk.git",
       version_bump_command: "bundle install && bundle exec rake version:bump && git checkout .bundle/config",
       version_show_command: "bundle exec rake version:show",
       dependency_update_command: "bundle install && bundle exec rake dependencies && git checkout .bundle/config",
@@ -52,7 +52,7 @@ Lita.configure do |config|
     },
     "harmony" => {
       pipeline: "harmony-trigger-ad_hoc",
-      github_url: "git@github.com:chef/lita-test.git",
+      github_url: "https://github.com/chef/lita-test.git",
       version_bump_command: "bundle install && bundle exec rake version:bump_patch",
       version_show_command: "bundle exec rake version:show",
       dependency_update_command: "bundle install && bundle exec rake dependencies && git checkout .bundle/config",
