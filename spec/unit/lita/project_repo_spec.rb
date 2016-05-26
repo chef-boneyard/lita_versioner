@@ -1,7 +1,7 @@
 require "spec_helper"
-require "lita/project_repo"
+require "lita_versioner/project_repo"
 
-RSpec.describe Lita::ProjectRepo do
+RSpec.describe LitaVersioner::ProjectRepo do
 
   let(:git_url) { "git@github.com:chef/omnibus-harmony.git" }
 

@@ -1,7 +1,7 @@
 require "spec_helper"
-require "lita/dependency_update_builder"
+require "lita_versioner/dependency_update_builder"
 
-RSpec.describe Lita::DependencyUpdateBuilder do
+RSpec.describe LitaVersioner::DependencyUpdateBuilder do
 
   let(:dependency_branch) { "auto_dependency_bump_test" }
 
@@ -11,7 +11,7 @@ RSpec.describe Lita::DependencyUpdateBuilder do
     end
   end
 
-  let(:project_repo) { instance_double("Lita::ProjectRepo") }
+  let(:project_repo) { instance_double("LitaVersioner::ProjectRepo") }
 
   subject(:dependency_update_builder) do
     described_class.new(handler: handler, dependency_branch: dependency_branch)

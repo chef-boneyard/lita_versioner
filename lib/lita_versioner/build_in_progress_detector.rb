@@ -1,7 +1,7 @@
 require "ffi_yajl"
-require "lita/jenkins_http"
+require_relative "jenkins_http"
 
-module Lita
+module LitaVersioner
   class BuildInProgressDetector
 
     PIPELINE_JOBS = %w{ build test }.freeze

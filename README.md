@@ -1,8 +1,8 @@
-# lita-versioner
+# lita_versioner
 
-[![Build Status](https://travis-ci.org/chef/lita-versioner.png?branch=master)](https://travis-ci.org/chef/lita-versioner)
+[![Build Status](https://travis-ci.org/chef/lita_versioner.png?branch=master)](https://travis-ci.org/chef/lita_versioner)
 
-This plugin acts as a bridge between Github and Jenkins. When a pull request is merged in Github, `lita-versioner` automatically increases the version of the projects and triggers a Jenkins job.
+This plugin acts as a bridge between Github and Jenkins. When a pull request is merged in Github, `lita_versioner` automatically increases the version of the projects and triggers a Jenkins job.
 
 ## Configuration
 
@@ -124,7 +124,7 @@ To test that the version bumper correctly listens to github hooks, set up a gith
 
 To update the bot, you've one more thing to do: Deliver!
 
-1. Create a PR setting the SHA in https://github.com/chef-cookbooks/oc-lita/blob/master/recipes/_plugin_versioner.rb to latest `master` of `lita-versioner` and bumping the version in `https://github.com/chef-cookbooks/oc-lita/blob/master/metadata.rb`.
+1. Create a PR setting the SHA in https://github.com/chef-cookbooks/oc-lita/blob/master/recipes/_plugin_versioner.rb to latest `master` of `lita_versioner` and bumping the version in `https://github.com/chef-cookbooks/oc-lita/blob/master/metadata.rb`.
 2. Get a C/R, and have that person `@delivery approve` the PR.
 3. If you are adding a repository, create or edit the github hook for that repository to point at the acceptance lita (example: https://github.com/chef/chef/settings/hooks/7767887). It should:
    - Payload URL: http://lita-relay-public-acceptance.chef.co/github_handler

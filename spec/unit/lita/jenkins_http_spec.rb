@@ -1,7 +1,7 @@
 require "spec_helper"
-require "lita/jenkins_http"
+require "lita_versioner/jenkins_http"
 
-RSpec.describe Lita::JenkinsHTTP do
+RSpec.describe LitaVersioner::JenkinsHTTP do
 
   let(:username) { "bobotclown" }
 
@@ -171,7 +171,7 @@ RSpec.describe Lita::JenkinsHTTP do
           # we have to stub the request creation.
           allow(jenkins_http).to receive(:request).with(http_method, path).and_return(expected_request)
           expect(jenkins_http.client).to receive(:request).with(expected_request).and_return(response)
-          expect { jenkins_http.get(path) }.to raise_error(Lita::JenkinsHTTP::JenkinsHTTPError) do |e|
+          expect { jenkins_http.get(path) }.to raise_error(LitaVersioner::JenkinsHTTP::JenkinsHTTPError) do |e|
             expect(e.to_s).to eq(<<-ERROR_MESSAGE)
 Jenkins API Request failed with Net::HTTPFatalError
 
@@ -202,7 +202,7 @@ ERROR_MESSAGE
           # we have to stub the request creation.
           allow(jenkins_http).to receive(:request).with(http_method, path).and_return(expected_request)
           expect(jenkins_http.client).to receive(:request).with(expected_request).and_raise(network_exception)
-          expect { jenkins_http.get(path) }.to raise_error(Lita::JenkinsHTTP::JenkinsHTTPError) do |e|
+          expect { jenkins_http.get(path) }.to raise_error(LitaVersioner::JenkinsHTTP::JenkinsHTTPError) do |e|
             expect(e.to_s).to eq(<<-ERROR_MESSAGE)
 Jenkins API Request failed with Errno::ECONNREFUSED
 

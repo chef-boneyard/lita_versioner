@@ -1,11 +1,13 @@
+require_relative "lib/lita_versioner/version.rb"
+
 Gem::Specification.new do |spec|
-  spec.name          = "lita-versioner"
-  spec.version       = "0.1.0"
+  spec.name          = "lita_versioner"
+  spec.version       = LitaVersioner::VERSION
   spec.authors       = ["Serdar Sutay"]
   spec.email         = ["serdar@chef.io"]
   spec.description   = "Lita plugin to drive Jenkins per Github pull requests."
   spec.summary       = "Lita plugin to drive Jenkins per Github pull requests."
-  spec.homepage      = "https://github.com/chef/lita-versioner"
+  spec.homepage      = "https://github.com/chef/lita_versioner"
   spec.license       = "Apache-2.0"
   spec.metadata      = { "lita_plugin_type" => "handler" }
 

@@ -19,7 +19,7 @@ USER lita
 EXPOSE 8080
 # Allow the user to mount their own stuff into /home/lita
 VOLUME /home/lita
-# Put lita-versioner itself in /opt/bumpbot
+# Put lita_versioner itself in /opt/bumpbot
 VOLUME /opt/bumpbot
 WORKDIR /opt/bumpbot
 

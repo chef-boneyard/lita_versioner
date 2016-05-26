@@ -2,7 +2,7 @@ require "mixlib/shellout"
 require "json"
 require "uri"
 
-module Lita
+module LitaVersioner
   class ProjectRepo
     class CommandError < StandardError; end
 

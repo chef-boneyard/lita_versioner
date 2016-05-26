@@ -1,7 +1,7 @@
 require "spec_helper"
-require "lita/build_in_progress_detector"
+require "lita_versioner/build_in_progress_detector"
 
-RSpec.describe Lita::BuildInProgressDetector do
+RSpec.describe LitaVersioner::BuildInProgressDetector do
 
   ##
   # NOTE: these examples have a lot of extra content removed. If you need to

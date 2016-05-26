@@ -2,7 +2,7 @@ require "spec_helper"
 require "tmpdir"
 require "fileutils"
 
-describe Lita::ProjectRepo, lita: true do
+describe LitaVersioner::ProjectRepo, lita: true do
 
   let(:tmpdir) { Dir.mktmpdir }
   let(:project_name) { "lita-versioner" }
@@ -17,7 +17,7 @@ describe Lita::ProjectRepo, lita: true do
       h.send(:init_event, "test")
     end
   end
-  let(:project_repo) { Lita::ProjectRepo.new(handler) }
+  let(:project_repo) { LitaVersioner::ProjectRepo.new(handler) }
 
   before do
     registry.register_handler(Lita::Handlers::BumpbotHandler)

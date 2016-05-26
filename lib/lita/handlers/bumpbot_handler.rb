@@ -1,8 +1,15 @@
+require "lita"
 require "forwardable"
+require_relative "../../lita_versioner"
+require_relative "../../lita_versioner/jenkins_http"
 
 module Lita
   module Handlers
     class BumpbotHandler < Handler
+      # include LitaVersioner so we get the constants from it (so we can use the
+      # classes easily here and in subclasses)
+      include LitaVersioner
+
       config :jenkins_username, required: true
       config :jenkins_api_token, required: true
       config :jenkins_endpoint, default: "http://manhattan.ci.chef.co/"
@@ -244,7 +251,7 @@ module Lita
 
       def source_by_name(channel_name)
         room = Lita::Room.fuzzy_find(channel_name)
-        source = Source.new(room: room) if room
+        source = Lita::Source.new(room: room) if room
         log_each_line(:error, "Unable to resolve ##{channel_name}.") unless source
         source
       end
