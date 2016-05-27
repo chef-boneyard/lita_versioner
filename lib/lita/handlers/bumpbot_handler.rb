@@ -1,7 +1,10 @@
 require "lita"
 require "forwardable"
+require "tmpdir"
+require "fileutils"
 require_relative "../../lita_versioner"
 require_relative "../../lita_versioner/jenkins_http"
+require "shellwords"
 
 module Lita
   module Handlers
@@ -10,6 +13,8 @@ module Lita
       # classes easily here and in subclasses)
       include LitaVersioner
 
+      namespace "versioner"
+
       config :jenkins_username, required: true
       config :jenkins_api_token, required: true
       config :jenkins_endpoint, default: "http://manhattan.ci.chef.co/"
@@ -17,16 +22,43 @@ module Lita
       config :trigger_real_builds, default: false
       config :default_inform_channel, default: "chef-notify"
       config :projects, default: {}
-
-      namespace "versioner"
+      config :cache_directory, default: "#{Dir.tmpdir}/lita_versioner"
+      config :sandbox_directory, default: "#{Dir.tmpdir}/lita_versioner/sandbox"
+      config :debug_lines_in_pm, default: true
 
       attr_accessor :project_name
       attr_reader :handler_name
       attr_reader :response
+      attr_accessor :http_response
+
+      #
+      # Unique ID for the handler
+      #
+      attr_reader :handler_id
 
       def self.inherited(klass)
         super
         klass.namespace("versioner")
+      end
+
+      @@handler_mutex = Mutex.new
+      @@handler_id = 0
+
+      # Give the handler a monotonically increasing ID
+      def initialize(*args)
+        super
+        @@handler_mutex.synchronize do
+          @@handler_id += 1
+          @handler_id = @@handler_id.to_s
+        end
+      end
+
+      def project_repo
+        @project_repo ||= ProjectRepo.new(self)
+      end
+
+      def cleanup
+        FileUtils.rm_rf(sandbox_directory)
       end
 
       #
@@ -43,7 +75,9 @@ module Lita
       #   }
       # @param max_args [Int] Maximum number of extra arguments that this command takes.
       #
-      def self.command_route(command, method_sym, help, max_args = 0)
+      def self.command_route(command, help, max_args: 0, &block)
+        help = { "" => help } unless help.is_a?(Hash)
+
         complete_help = {}
         help.each do |arg, text|
           complete_help["#{command} PROJECT #{arg}".strip] = text
@@ -53,14 +87,28 @@ module Lita
           # instance - so we can set instance variables etc.
           begin
             init_command(command, response, complete_help, max_args)
-            public_send(method_sym)
+            instance_exec(*command_args, &block)
+            cleanup
           rescue ErrorAlreadyReported
-            error("Aborting bump bot command \"#{response.message.body}\" due to previously raised error")
+            debug("Sandbox: #{sandbox_directory}")
           rescue
             msg = "Unhandled error while working on \"#{response.message.body}\":\n" +
-              "```#{$!}\n#{$!.backtrace.join("\n")}```"
+              "```#{$!}\n#{$!.backtrace.join("\n")}```."
             error(msg)
+            debug("Sandbox: #{sandbox_directory}")
           end
+        end
+      end
+
+      #
+      # Cache directory for this handler instance to
+      #
+      def sandbox_directory
+        @sandbox_directory ||= begin
+          dir = File.join(config.sandbox_directory, handler_id)
+          FileUtils.rm_rf(dir)
+          FileUtils.mkdir_p(dir)
+          dir
         end
       end
 
@@ -73,11 +121,13 @@ module Lita
       def handle_event(title)
         init_event(title)
         yield
+        cleanup
       rescue ErrorAlreadyReported
-        error("Aborting message handler \"#{title}\" due to previously raised error")
+        debug("Sandbox: #{sandbox_directory}")
       rescue
         msg = "Unhandled error while working on \"#{title}\":\n" +
-          "```#{$!}\n#{$!.backtrace.join("\n")}"
+          "```#{$!}\n#{$!.backtrace.join("\n")}."
+        debug("Sandbox: #{sandbox_directory}")
         error(msg)
       end
 
@@ -85,11 +135,13 @@ module Lita
         Bundler.with_clean_env do
           options[:timeout] = timeout
 
+          command = Shellwords.join(command) if command.is_a?(Array)
           debug("Running \"#{command}\" with #{options}")
           shellout = Mixlib::ShellOut.new(command, options)
           shellout.run_command
-          debug("STDOUT:#{shellout.stdout}\nSTDERR:#{shellout.stderr}")
           shellout.error!
+          debug("STDOUT:\n```#{shellout.stdout}```\n")
+          debug("STDERR:\n```#{shellout.stderr}```\n") if shellout.stderr != ""
           shellout
         end
       end
@@ -130,12 +182,15 @@ module Lita
         @command_args ||= response.args.drop(1) if response
       end
 
-      def error!(message)
-        error(message)
+      def error!(message, status: "500")
+        error(message, status: status)
         raise ErrorAlreadyReported.new(message)
       end
 
-      def error(message)
+      def error(message, status: "500")
+        if http_response
+          http_response.status = status
+        end
         send_message("**ERROR:** #{message}")
         log_each_line(:error, message)
       end
@@ -152,7 +207,7 @@ module Lita
 
       # debug messages are only sent to users in private messages
       def debug(message)
-        send_message(message) if response && response.private_message?
+        send_message(message) if response && response.private_message? && config.debug_lines_in_pm
         log_each_line(:debug, message)
       end
 
@@ -183,7 +238,7 @@ module Lita
         @response = response
         error!("No project specified!\n#{usage(help)}") if response.args.empty?
         @project_name = response.args[0]
-        debug("Starting")
+        debug("Handling command #{command.inspect}")
         unless project
           error!("Invalid project. Valid projects: #{projects.keys.join(", ")}.\n#{usage(help)}")
         end
@@ -198,7 +253,7 @@ module Lita
       def init_event(name)
         @handler_name = name
         @response = nil
-        debug("Starting")
+        debug("Handling event #{name}")
       end
 
       #
@@ -236,6 +291,10 @@ module Lita
         else
           room = message_source
           robot.send_message(room, message) if room
+        end
+        if http_response
+          message = "#{message}\n" unless message.end_with?("\n")
+          http_response.body << message
         end
       end
 

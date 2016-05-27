@@ -23,11 +23,10 @@ module LitaVersioner
     end
 
     def project_repo
-      @repo ||= ProjectRepo.new(handler)
+      handler.project_repo
     end
 
     def run
-      synchronize_repo
       if dependency_updates_disabled?
         message = "dependency updates disabled, skipping"
         handler.info(message)
@@ -51,10 +50,6 @@ module LitaVersioner
       push_changes_to_upstream
 
       [ true, "dependency updates pushed to #{dependency_branch}" ]
-    end
-
-    def synchronize_repo
-      project_repo.refresh
     end
 
     def dependency_updates_disabled?
