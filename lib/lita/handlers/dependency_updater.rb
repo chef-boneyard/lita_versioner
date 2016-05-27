@@ -21,23 +21,19 @@ module Lita
       #
       # Chat commands
       #
-      command_route "bump-deps", :update_dependencies_from_command, {
-        "" => "Runs the dependency bumper and submits a build if there are new deps",
-      }
-
-      command_route "forget-bump-deps-builds", :forget_bump_deps_builds, {
-        "" => "Forget failed bump-deps builds (fixes 'waiting for the quiet period to expire before building again')",
-      }
-
-      def update_dependencies_from_command
+      command_route(
+        "bump-deps",
+        "Runs the dependency bumper and submits a build if there are new deps"
+      ) do
         info("Checking for updated dependencies for #{project_name}...")
         update_dependencies
       end
 
-      def forget_bump_deps_builds
-        repo = ProjectRepo.new(self)
-        repo.refresh
-        repo.delete_branch(DEPENDENCY_BRANCH_NAME)
+      command_route(
+        "forget-bump-deps-builds",
+        "Forget failed bump-deps builds (fixes 'waiting for the quiet period to expire before building again')"
+      ) do
+        project_repo.delete_branch(DEPENDENCY_BRANCH_NAME)
         info("Deleted local branch #{DEPENDENCY_BRANCH_NAME} of #{project_name}.")
       end
 

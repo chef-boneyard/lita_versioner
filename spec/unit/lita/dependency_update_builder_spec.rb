@@ -21,15 +21,6 @@ RSpec.describe LitaVersioner::DependencyUpdateBuilder do
     allow(dependency_update_builder).to receive(:project_repo).and_return(project_repo)
   end
 
-  describe "synchronize_repo" do
-
-    it "refreshes the project repo" do
-      expect(project_repo).to receive(:refresh)
-      dependency_update_builder.synchronize_repo
-    end
-
-  end
-
   context "when a 'don't bump deps' file is present" do
 
     before do
@@ -43,7 +34,6 @@ RSpec.describe LitaVersioner::DependencyUpdateBuilder do
     end
 
     it "does not run any dependency update or build steps" do
-      expect(project_repo).to receive(:refresh)
       expect(dependency_update_builder.run).to eq([false, "dependency updates disabled, skipping"])
     end
 
@@ -79,7 +69,6 @@ RSpec.describe LitaVersioner::DependencyUpdateBuilder do
       end
 
       it "doesn't create a branch or start a build" do
-        expect(project_repo).to receive(:refresh)
         expect(project_repo).to receive(:update_dependencies)
         expect(dependency_update_builder.run).to eq([false, "dependencies on master are up to date"])
       end
@@ -135,7 +124,6 @@ RSpec.describe LitaVersioner::DependencyUpdateBuilder do
           end
 
           it "should not submit the changes for a new build" do
-            expect(project_repo).to receive(:refresh)
             expect(project_repo).to receive(:update_dependencies)
             message = "dependency changes failed a previous build. waiting for the quiet period to expire before building again"
             expect(dependency_update_builder.run).to eq([false, message])
@@ -156,7 +144,6 @@ RSpec.describe LitaVersioner::DependencyUpdateBuilder do
           end
 
           it "should submit the changes for a new build" do
-            expect(project_repo).to receive(:refresh)
             expect(project_repo).to receive(:update_dependencies)
             expect(dependency_update_builder).to receive(:push_changes_to_upstream)
             expect(dependency_update_builder.run).to eq([true, "dependency updates pushed to #{dependency_branch}"])
@@ -182,7 +169,6 @@ RSpec.describe LitaVersioner::DependencyUpdateBuilder do
         end
 
         it "should submit the changes for new build" do
-          expect(project_repo).to receive(:refresh)
           expect(project_repo).to receive(:update_dependencies)
           expect(dependency_update_builder).to receive(:push_changes_to_upstream)
           expect(dependency_update_builder.run).to eq([true, "dependency updates pushed to #{dependency_branch}"])
