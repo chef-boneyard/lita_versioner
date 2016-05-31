@@ -82,7 +82,7 @@ module Lita
         help.each do |arg, text|
           complete_help["#{command} PROJECT #{arg}".strip] = text
         end
-        route(/^#{command}\b/, nil, command: true, help: complete_help) do |response|
+        route(/^#{command}(\s|$)/, nil, command: true, help: complete_help) do |response|
           # This block will be instance-evaled in the context of the handler
           # instance - so we can set instance variables etc.
           begin
