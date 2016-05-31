@@ -27,9 +27,13 @@ module Lita
       config :debug_lines_in_pm, default: true
 
       attr_accessor :project_name
+      attr_reader :command_args
       attr_reader :handler_name
       attr_reader :response
       attr_accessor :http_response
+      attr_reader :started_at
+      attr_accessor :finished_at
+      attr_reader :logs
 
       #
       # Unique ID for the handler
@@ -44,6 +48,11 @@ module Lita
       @@handler_mutex = Mutex.new
       @@handler_id = 0
 
+      @@running_handlers = Set.new
+      def self.running_handlers
+        @@running_handlers
+      end
+
       # Give the handler a monotonically increasing ID
       def initialize(*args)
         super
@@ -51,6 +60,13 @@ module Lita
           @@handler_id += 1
           @handler_id = @@handler_id.to_s
         end
+        @started_at = Time.now
+        @@current_handlers.add(self)
+      end
+
+      def deinitialize
+        @finished_at = Time.now
+        @@current_handlers.delete(self)
       end
 
       def project_repo
@@ -73,20 +89,26 @@ module Lita
       #     'EXTRA_ARG_NAME' => 'some usage',
       #     'DIFFERENT_ARG SEQUENCE HERE' => 'different usage'
       #   }
-      # @param max_args [Int] Maximum number of extra arguments that this command takes.
+      # @param max_args [Int] Maximum number of arguments that this command takes.
+      # @param project_arg [Boolean] Whether to include PROJECT as the first argument (default: true).
       #
-      def self.command_route(command, help, max_args: 0, &block)
+      def self.command_route(command, help, project_arg: true, max_args: project_arg ? 1 : 0, &block)
         help = { "" => help } unless help.is_a?(Hash)
 
         complete_help = {}
         help.each do |arg, text|
-          complete_help["#{command} PROJECT #{arg}".strip] = text
+          if project_arg
+            complete_help["#{command} PROJECT #{arg}".strip] = text
+          else
+            complete_help["#{command} #{arg}".strip] = text
+          end
         end
-        route(/^#{command}\b/, nil, command: true, help: complete_help) do |response|
+
+        route(/^#{command}(\s|$)/, nil, command: true, help: complete_help) do |response|
           # This block will be instance-evaled in the context of the handler
           # instance - so we can set instance variables etc.
           begin
-            init_command(command, response, complete_help, max_args)
+            init_command(command, response, complete_help, max_args, project_arg)
             instance_exec(*command_args, &block)
             cleanup
           rescue ErrorAlreadyReported
@@ -96,6 +118,8 @@ module Lita
               "```#{$!}\n#{$!.backtrace.join("\n")}```."
             error(msg)
             debug("Sandbox: #{sandbox_directory}")
+          ensure
+            deinitialize
           end
         end
       end
@@ -129,6 +153,8 @@ module Lita
           "```#{$!}\n#{$!.backtrace.join("\n")}."
         debug("Sandbox: #{sandbox_directory}")
         error(msg)
+      ensure
+        deinitialize
       end
 
       def run_command(command, timeout: 3600, **options)
@@ -136,11 +162,13 @@ module Lita
           options[:timeout] = timeout
 
           command = Shellwords.join(command) if command.is_a?(Array)
-          debug("Running \"#{command}\" with #{options}")
+          debug("")
+          debug("**Running `#{command}`** with #{options}")
           shellout = Mixlib::ShellOut.new(command, options)
           shellout.run_command
+          debug("Finished `#{command}` with status #{shellout.exitstatus}")
           shellout.error!
-          debug("STDOUT:\n```#{shellout.stdout}```\n")
+          debug("STDOUT:\n```#{shellout.stdout}```\n") if shellout.stdout != ""
           debug("STDERR:\n```#{shellout.stderr}```\n") if shellout.stderr != ""
           shellout
         end
@@ -173,13 +201,6 @@ module Lita
         end
 
         return true
-      end
-
-      #
-      # Optional command arguments if this handler is a command handler.
-      #
-      def command_args
-        @command_args ||= response.args.drop(1) if response
       end
 
       def error!(message, status: "500")
@@ -233,17 +254,26 @@ module Lita
       #
       # Initialize this handler as a chat command handler.
       #
-      def init_command(command, response, help, max_args)
+      def init_command(command, response, help, max_args, project_arg)
         @handler_name = command
         @response = response
-        error!("No project specified!\n#{usage(help)}") if response.args.empty?
-        @project_name = response.args[0]
-        debug("Handling command #{command.inspect}")
-        unless project
-          error!("Invalid project. Valid projects: #{projects.keys.join(", ")}.\n#{usage(help)}")
+        if project_arg
+          error!("No project specified!\n#{usage(help)}") if response.args.empty?
+          @project_name = response.args[0]
+          @command_args = response.args[1..-1]
+        else
+          @command_args = response.args
         end
-        if command_args.size > max_args
-          error!("Too many arguments (#{command_args.size + 1} for #{max_args + 1})!\n#{usage(help)}")
+        debug("Handling command #{command.inspect}")
+
+        if project_arg
+          unless project
+            error!("Invalid project. Valid projects: #{projects.keys.join(", ")}.\n#{usage(help)}")
+          end
+        end
+
+        if response.args.size > max_args
+          error!("Too many arguments (#{response.args} for #{max_args})!\n#{usage(help)}")
         end
       end
 
@@ -273,6 +303,8 @@ module Lita
       # from when reading syslog.
       #
       def log_each_line(log_method, message)
+        logs << [ Time.now, log_method, message ]
+
         prefix = "<#{handler_name}>{#{project_name || "unknown"}} "
         message.to_s.each_line do |l|
           log.public_send(log_method, "#{prefix}#{l.chomp}")
