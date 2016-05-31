@@ -22,7 +22,7 @@ module Lita
       # Chat commands
       #
       command_route(
-        "",
+        "update dependencies",
         "Runs the dependency updater and submits a build if there are new dependencies."
       ) do
         info("Checking for updated dependencies for #{project_name}...")
