@@ -178,9 +178,7 @@ module Lita
       #
       # Optional command arguments if this handler is a command handler.
       #
-      def command_args
-        @command_args ||= response.args.drop(1) if response
-      end
+      attr_reader :command_args
 
       def error!(message, status: "500")
         error(message, status: status)
@@ -234,13 +232,17 @@ module Lita
       # Initialize this handler as a chat command handler.
       #
       def init_command(command, response, help, max_args)
+        command_words = command.split(/\s+/)
         @handler_name = command
         @response = response
-        error!("No project specified!\n#{usage(help)}") if response.args.empty?
-        @project_name = response.args[0]
+        # strip extra words from the args, like "update dependencies"
+        args = response.args[command_words.size - 1..-1]
+        error!("No project specified!\n#{usage(help)}") if args.empty?
+        @project_name = args.shift
+        @command_args = args
         debug("Handling command #{command.inspect}")
         unless project
-          error!("Invalid project. Valid projects: #{projects.keys.join(", ")}.\n#{usage(help)}")
+          error!("Invalid project #{project_name}. Valid projects: #{projects.keys.join(", ")}.\n#{usage(help)}")
         end
         if command_args.size > max_args
           error!("Too many arguments (#{command_args.size + 1} for #{max_args + 1})!\n#{usage(help)}")

@@ -76,7 +76,7 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
     it "build blarghle emits a reasonable error message" do
       send_command("build blarghle")
       expect(reply_string).to eq(<<-EOM.gsub!(/^        /, ""))
-        **ERROR:** Invalid project. Valid projects: lita-test.
+        **ERROR:** Invalid project blarghle. Valid projects: lita-test.
         Usage: build PROJECT [GIT_REF]   - Kicks off a build for PROJECT with GIT_REF. GIT_REF default: master.
       EOM
     end
@@ -129,7 +129,7 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
       send_command("bump blarghle")
 
       expect(reply_string).to eq(<<-EOM.gsub!(/^        /, ""))
-        **ERROR:** Invalid project. Valid projects: lita-test.
+        **ERROR:** Invalid project blarghle. Valid projects: lita-test.
         Usage: bump PROJECT   - Bumps the version of PROJECT and starts a build.
       EOM
     end
