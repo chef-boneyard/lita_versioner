@@ -4,16 +4,18 @@ require_relative "jenkins_http"
 module LitaVersioner
   class BuildInProgressDetector
 
-    PIPELINE_JOBS = %w{ build test }.freeze
+    PIPELINE_JOBS = %w{ build test release }.freeze
 
     attr_reader :pipeline
+    attr_reader :trigger
     attr_reader :jenkins_username
     attr_reader :jenkins_api_token
     attr_reader :jenkins_endpoint
     attr_reader :target_git_ref
 
-    def initialize(pipeline: nil, jenkins_username: nil, jenkins_api_token: nil, jenkins_endpoint: nil, target_git_ref: nil)
+    def initialize(pipeline: nil, trigger: nil, jenkins_username: nil, jenkins_api_token: nil, jenkins_endpoint: nil, target_git_ref: nil)
       @pipeline = pipeline
+      @trigger = trigger
       @jenkins_username = jenkins_username
       @jenkins_api_token = jenkins_api_token
       @jenkins_endpoint = jenkins_endpoint
@@ -21,7 +23,7 @@ module LitaVersioner
     end
 
     def jenkins_jobs
-      PIPELINE_JOBS.map { |j| "#{pipeline}-#{j}" }
+      [ trigger ] + PIPELINE_JOBS.map { |j| "#{pipeline}-#{j}" }
     end
 
     def conflicting_build_running?
@@ -52,9 +54,8 @@ module LitaVersioner
       json_data = builds_data_for_job(job)
       job_data = FFI_Yajl::Parser.parse(json_data)
 
-      last_completed_build_number = job_data["lastCompletedBuild"]["number"]
       in_progress_build_data = job_data["builds"].select do |build|
-        build["number"] > last_completed_build_number
+        build["result"].nil?
       end
       in_progress_build_data.map { |b| b["number"] }
     end
@@ -66,7 +67,7 @@ module LitaVersioner
 
     # @api private
     def builds_data_for_job(job)
-      jenkins_api.get("/job/#{job}/api/json?pretty=true").body
+      jenkins_api.get("/job/#{job}/api/json?pretty=true&tree=name,url,upstreamProjects[name],downstreamProjects[name],builds[number,result,parameters[name,value]]]").body
     end
 
     # @api private

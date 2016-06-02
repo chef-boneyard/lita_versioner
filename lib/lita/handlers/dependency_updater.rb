@@ -13,7 +13,6 @@ module Lita
 
       DEPENDENCY_BRANCH_NAME = "auto_dependency_bump_test".freeze
 
-      FAILURE_NOTIFICATION_RATE_LIMIT_FILE = "./cache/failure_notification_rate_limit".freeze
       FAILURE_NOTIFICATION_QUIET_TIME = 3600
 
       on :loaded, :setup_polling
@@ -64,7 +63,8 @@ module Lita
       end
 
       def update_dependencies
-        conflict_checker = BuildInProgressDetector.new(pipeline: project_name,
+        conflict_checker = BuildInProgressDetector.new(trigger: "#{project_name}-trigger-ad_hoc",
+                                                       pipeline: project_name,
                                                        jenkins_username: config.jenkins_username,
                                                        jenkins_api_token: config.jenkins_api_token,
                                                        jenkins_endpoint: config.jenkins_endpoint,
@@ -87,11 +87,15 @@ module Lita
         true
       end
 
+      def failure_notification_rate_limit_file
+        File.join(sandbox_directory, "failure_notification_rate_limit")
+      end
+
       def rate_limit_exceeded?
         # Check if we've exceeded the rate limit
-        if File.exist?(FAILURE_NOTIFICATION_RATE_LIMIT_FILE)
+        if File.exist?(failure_notification_rate_limit_file)
           now = Time.new
-          last_notification = File.mtime(FAILURE_NOTIFICATION_RATE_LIMIT_FILE)
+          last_notification = File.mtime(failure_notification_rate_limit_file)
           elapsed = now - last_notification
           exceeded = elapsed < FAILURE_NOTIFICATION_QUIET_TIME
 
@@ -102,9 +106,9 @@ module Lita
         end
 
         # Set the last notification time in the file
-        parent_dir = File.dirname(FAILURE_NOTIFICATION_RATE_LIMIT_FILE)
+        parent_dir = File.dirname(failure_notification_rate_limit_file)
         FileUtils.mkdir_p(parent_dir) unless File.exist?(parent_dir)
-        FileUtils.touch(FAILURE_NOTIFICATION_RATE_LIMIT_FILE)
+        FileUtils.touch(failure_notification_rate_limit_file)
 
         # Return whether we exceeded or not
         exceeded
