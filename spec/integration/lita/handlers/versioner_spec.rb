@@ -3,71 +3,41 @@ require "tmpdir"
 require "fileutils"
 
 describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers: Lita::Handlers::BumpbotHandler do
-  let(:config) { Lita.config.handlers.versioner }
-  let(:git_remote) { File.join(tmpdir, "lita-test") }
-
-  # Create a notifications room to receive notifications from event handlers
-  let(:notifications_room) { Lita::Room.create_or_update("#notifications") }
+  # Initialize lita
   before do
-    allow_any_instance_of(Lita::Handlers::BumpbotHandler).to receive(:source_by_name) { |name| notifications_room }
-  end
-
-  # Create a repository with file.txt = A, deps.txt=X
-  attr_reader :initial_commit_sha
-  before do
-    create_remote_git_repo(git_remote, "a.txt" => "A", "file.txt" => "A", "deps.txt" => "X")
-    @initial_commit_sha = git_sha(git_remote, ref: "master")
-  end
-
-  def reply_lines
-    replies.flat_map { |r| r.lines }.map { |l| l.chomp }
-  end
-
-  def reply_string
-    reply_lines.map { |l| "#{l}\n" }.join("")
-  end
-
-  #
-  # Give us a jenkins_http we can expect http messages from
-  #
-  let(:jenkins_http) { double("jenkins_http") }
-  before do
-    allow(LitaVersioner::JenkinsHTTP).to receive(:new).
-      with(base_uri: "http://manhattan.ci.chef.co/", username: "ci", api_token: "ci_api_token").
-      and_return(jenkins_http)
-  end
-
-  # Configure the bot
-  before do
-    config.jenkins_username = "ci"
-    config.jenkins_api_token = "ci_api_token"
-    config.trigger_real_builds = true
-    config.cache_directory = File.join(tmpdir, "cache")
-    config.sandbox_directory = File.join(config.cache_directory, "sandbox")
-    config.debug_lines_in_pm = false
-    config.default_inform_channel = "default_notifications"
-    config.projects = {
+    Lita.config.handlers.versioner.projects = {
       "lita-test" => {
         pipeline: "lita-test-trigger-release",
         github_url: git_remote,
         version_bump_command: "cat a.txt >> file.txt",
         version_show_command: "cat file.txt",
-        dependency_update_command: "echo Y > deps.txt",
+        dependency_update_command: "cat a.txt > deps.txt",
         inform_channel: "notifications",
       },
     }
+  end
+
+  let(:git_remote) { File.join(tmpdir, "lita-test") }
+
+  # Create a repository with file.txt = A, deps.txt=X
+  attr_reader :initial_commit_sha
+  before do
+    create_remote_git_repo(git_remote, "a.txt" => "A", "file.txt" => "A", "deps.txt" => "X")
+    @initial_commit_sha = git_sha(git_remote)
   end
 
   # We override route() - therefore, the matcher doesn't work correctly.
   #it { is_expected.to route_command("build lita-test").to(:build) }
   it { is_expected.to route_http(:post, "/github_handler").to(:github_handler) }
 
+  with_jenkins_server "http://manhattan.ci.chef.co"
+
   context "build" do
 
     it "build with no arguments emits a reasonable error message" do
       send_command("build")
 
-      expect(reply_string).to eq(<<-EOM.gsub!(/^        /, ""))
+      expect(reply_string).to eq(strip_eom_block(<<-EOM))
         **ERROR:** No project specified!
         Usage: build PROJECT [GIT_REF]   - Kicks off a build for PROJECT with GIT_REF. GIT_REF default: master.
       EOM
@@ -75,7 +45,7 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
 
     it "build blarghle emits a reasonable error message" do
       send_command("build blarghle")
-      expect(reply_string).to eq(<<-EOM.gsub!(/^        /, ""))
+      expect(reply_string).to eq(strip_eom_block(<<-EOM))
         **ERROR:** Invalid project blarghle. Valid projects: lita-test.
         Usage: build PROJECT [GIT_REF]   - Kicks off a build for PROJECT with GIT_REF. GIT_REF default: master.
       EOM
@@ -84,32 +54,28 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
     it "build lita-test master blarghle does not build (too many arguments)" do
       send_command("build lita-test master blarghle")
 
-      expect(reply_string).to eq(<<-EOM.gsub!(/^        /, ""))
+      expect(reply_string).to eq(strip_eom_block(<<-EOM))
         **ERROR:** Too many arguments (3 for 2)!
         Usage: build PROJECT [GIT_REF]   - Kicks off a build for PROJECT with GIT_REF. GIT_REF default: master.
       EOM
     end
 
-    it "build lita-test builds master" do
-      expect(jenkins_http).to receive(:post).with(
-        "/job/lita-test-trigger-release/buildWithParameters",
-        { "GIT_REF" => "master", "EXPIRE_CACHE" => false, "INITIATED_BY" => "Test User" })
+    it "build lita-test builds a release build of master" do
+      expect_jenkins_build("/job/lita-test-trigger-release", git_ref: "master", initiated_by: "Test User")
 
       send_command("build lita-test")
 
-      expect(reply_string).to eq(<<-EOM.gsub!(/^        /, ""))
+      expect(reply_string).to eq(strip_eom_block(<<-EOM))
         Kicked off a build for 'lita-test-trigger-release' at ref 'master'.
       EOM
     end
 
-    it "build lita-test example builds with the specified tag" do
-      expect(jenkins_http).to receive(:post).with(
-        "/job/lita-test-trigger-ad_hoc/buildWithParameters",
-        { "GIT_REF" => "example", "EXPIRE_CACHE" => false, "INITIATED_BY" => "Test User" })
+    it "build lita-test example builds an ad-hoc build with the specified tag" do
+      expect_jenkins_build("/job/lita-test-trigger-ad_hoc", git_ref: "example", initiated_by: "Test User")
 
       send_command("build lita-test example")
 
-      expect(reply_string).to eq(<<-EOM.gsub!(/^        /, ""))
+      expect(reply_string).to eq(strip_eom_block(<<-EOM))
         Kicked off a build for 'lita-test-trigger-ad_hoc' at ref 'example'.
       EOM
     end
@@ -119,7 +85,7 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
     it "build with no arguments emits a reasonable error message" do
       send_command("bump")
 
-      expect(reply_string).to eq(<<-EOM.gsub!(/^        /, ""))
+      expect(reply_string).to eq(strip_eom_block(<<-EOM))
         **ERROR:** No project specified!
         Usage: bump PROJECT   - Bumps the version of PROJECT and starts a build.
       EOM
@@ -128,7 +94,7 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
     it "build blarghle emits a reasonable error message" do
       send_command("bump blarghle")
 
-      expect(reply_string).to eq(<<-EOM.gsub!(/^        /, ""))
+      expect(reply_string).to eq(strip_eom_block(<<-EOM))
         **ERROR:** Invalid project blarghle. Valid projects: lita-test.
         Usage: bump PROJECT   - Bumps the version of PROJECT and starts a build.
       EOM
@@ -137,20 +103,18 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
     it "bump lita-test blarghle does not bump (too many arguments)" do
       send_command("bump lita-test blarghle")
 
-      expect(reply_string).to eq(<<-EOM.gsub!(/^        /, ""))
+      expect(reply_string).to eq(strip_eom_block(<<-EOM))
         **ERROR:** Too many arguments (2 for 1)!
         Usage: bump PROJECT   - Bumps the version of PROJECT and starts a build.
       EOM
     end
 
     it "bump lita-test bumps the version of lita-test" do
-      expect(jenkins_http).to receive(:post).with(
-        "/job/lita-test-trigger-release/buildWithParameters",
-        { "GIT_REF" => "vAA", "EXPIRE_CACHE" => false, "INITIATED_BY" => "Test User" })
+      expect_jenkins_build("/job/lita-test-trigger-release", git_ref: "vAA", initiated_by: "Test User")
 
       send_command("bump lita-test")
 
-      expect(reply_string).to eq(<<-EOM.gsub!(/^        /, ""))
+      expect(reply_string).to eq(strip_eom_block(<<-EOM))
         Bumped version to AA
         Kicked off release build for 'lita-test-trigger-release' at ref 'vAA'.
       EOM
@@ -171,7 +135,7 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
     #   send_command("bump lita-test")
     #   t.join
     #
-    #   expect(reply_string).to eq(<<-EOM.gsub!(/^        /, ""))
+    #   expect(reply_string).to eq(strip_eom_block(<<-EOM))
     #     Bumped version to AA
     #     Kicked off release build for 'lita-test-trigger-release' at ref 'vAA'.
     #     Bumped version to AA
@@ -190,20 +154,17 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
     # end
 
     it "bump lita-test followed by bump lita-test bumps the version from subsequent SHAs" do
-      expect(jenkins_http).to receive(:post).with(
-        "/job/lita-test-trigger-release/buildWithParameters",
-        { "GIT_REF" => "vAA", "EXPIRE_CACHE" => false, "INITIATED_BY" => "Test User" })
+      expect_jenkins_build("/job/lita-test-trigger-release", git_ref: "vAA", initiated_by: "Test User")
+
       send_command("bump lita-test")
 
       expect(git_file(git_remote, "file.txt")).to eq("AA")
 
-      expect(jenkins_http).to receive(:post).with(
-        "/job/lita-test-trigger-release/buildWithParameters",
-        { "GIT_REF" => "vAAA", "EXPIRE_CACHE" => false, "INITIATED_BY" => "Test User" })
+      expect_jenkins_build("/job/lita-test-trigger-release", git_ref: "vAAA", initiated_by: "Test User")
 
       send_command("bump lita-test")
 
-      expect(reply_string).to eq(<<-EOM.gsub!(/^        /, ""))
+      expect(reply_string).to eq(strip_eom_block(<<-EOM))
         Bumped version to AA
         Kicked off release build for 'lita-test-trigger-release' at ref 'vAA'.
         Bumped version to AAA
@@ -251,7 +212,7 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
         expect(response.status).to eq(500)
         expect(git_file(git_remote, "file.txt")).to eq("A")
 
-        expect(reply_string).to eq(<<-EOM.gsub!(/^          /, ""))
+        expect(reply_string).to eq(strip_eom_block(<<-EOM))
           **ERROR:** Repository 'blarghle' is not monitored by versioner!
         EOM
       end
@@ -274,7 +235,7 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
         expect(response.status).to eq(200)
         expect(git_file(git_remote, "file.txt")).to eq("A")
 
-        expect(reply_string).to eq(<<-EOM.gsub!(/^          /, ""))
+        expect(reply_string).to eq(strip_eom_block(<<-EOM))
           Skipping: 'https://github.com/chef/lita-test/pulls/1'. It was closed without merging any commits.
         EOM
         expect(response.body).to eq(reply_string)
@@ -285,16 +246,14 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
       it "bumps version and runs the build" do
         sha = create_commit(git_remote, "file.txt" => "Z")
 
-        expect(jenkins_http).to receive(:post).with(
-          "/job/lita-test-trigger-release/buildWithParameters",
-          { "GIT_REF" => "vZA", "EXPIRE_CACHE" => false, "INITIATED_BY" => "BumpBot" })
+        expect_jenkins_build("/job/lita-test-trigger-release", git_ref: "vZA", initiated_by: "BumpBot")
 
         response = post_github_event("pull_request", "lita-test", "closed", true, sha: sha)
         expect(response.status).to eq(200)
 
         expect(git_file(git_remote, "file.txt")).to eq("ZA")
 
-        expect(reply_string).to eq(<<-EOM.gsub!(/^          /, ""))
+        expect(reply_string).to eq(strip_eom_block(<<-EOM))
           'https://github.com/chef/lita-test/pulls/1' was just merged. Bumping version and submitting a build ...
           Bumped version to ZA
           Kicked off release build for 'lita-test-trigger-release' at ref 'vZA'.
@@ -312,15 +271,13 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
 
         expect(git_file(git_remote, "file.txt")).to eq("ZZ")
 
-        expect(jenkins_http).to receive(:post).with(
-          "/job/lita-test-trigger-release/buildWithParameters",
-          { "GIT_REF" => "vZZA", "EXPIRE_CACHE" => false, "INITIATED_BY" => "BumpBot" })
+        expect_jenkins_build("/job/lita-test-trigger-release", git_ref: "vZZA", initiated_by: "BumpBot")
 
         response2 = post_github_event("pull_request", "lita-test", "closed", true, sha: sha2, pull_number: 2)
         expect(response2.status).to eq(200)
 
         expect(git_file(git_remote, "file.txt")).to eq("ZZA")
-        expect(response2.body).to eq(<<-EOM.gsub!(/^          /, ""))
+        expect(response2.body).to eq(strip_eom_block(<<-EOM))
           'https://github.com/chef/lita-test/pulls/2' was just merged. Bumping version and submitting a build ...
           Bumped version to ZZA
           Kicked off release build for 'lita-test-trigger-release' at ref 'vZZA'.

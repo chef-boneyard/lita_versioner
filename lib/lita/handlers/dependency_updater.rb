@@ -64,7 +64,8 @@ module Lita
       end
 
       def update_dependencies
-        conflict_checker = BuildInProgressDetector.new(pipeline: project_name,
+        conflict_checker = BuildInProgressDetector.new(trigger: "#{project_name}-trigger-ad_hoc",
+                                                       pipeline: project_name,
                                                        jenkins_username: config.jenkins_username,
                                                        jenkins_api_token: config.jenkins_api_token,
                                                        jenkins_endpoint: config.jenkins_endpoint,

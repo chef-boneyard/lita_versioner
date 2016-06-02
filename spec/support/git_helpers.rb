@@ -21,7 +21,6 @@ module GitHelpers
     Dir.chdir(remote_path) do
       git %{init --bare}
       git %{config core.sharedrepository 1}
-      git %{config receive.denyNonFastforwards true}
       git %{config receive.denyCurrentBranch ignore}
     end
 
@@ -44,25 +43,33 @@ module GitHelpers
     end
   end
 
-  def create_commit(remote_path, files)
+  def with_clone(remote_path)
     # Push initial commit there
     commit_dir = Dir.mktmpdir
     begin
       FileUtils.mkdir_p(File.dirname(commit_dir))
       git %{clone #{remote_path} #{commit_dir}}
+
       Dir.chdir(commit_dir) do
-        files.each do |file, content|
-          IO.write(file, content)
-        end
-        git %{add --all}
-        git %{commit -am "Another commit"}
-        git %{push}
+        yield commit_dir
       end
+
     ensure
       FileUtils.remove_entry(commit_dir)
     end
+  end
 
-    git_sha(remote_path, ref: "master")
+  def create_commit(remote_path, files)
+    with_clone(remote_path) do
+      files.each do |file, content|
+        IO.write(file, content)
+      end
+      git %{add --all}
+      git %{commit -am "Another commit"}
+      git %{push}
+    end
+
+    git_sha(remote_path)
   end
 
   # Calculate the git sha for the given ref.
@@ -73,7 +80,7 @@ module GitHelpers
   #   the ref to show
   #
   # @return [String]
-  def git_sha(path, ref:)
+  def git_sha(path, ref: "master")
     Dir.chdir(path) do
       git("show-ref #{ref}").stdout.split(/\s/).first
     end
