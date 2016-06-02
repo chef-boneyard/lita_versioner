@@ -116,6 +116,7 @@ describe Lita::Handlers::DependencyUpdater, lita_handler: true, additional_lita_
                 expect(reply_string).to eq(strip_eom_block(<<-EOM))
                   Checking for updated dependencies for lita-test...
                   dependencies on master are up to date
+                  **ERROR:** Dependency update build not triggered: dependencies on master are up to date
                 EOM
                 expect(git_file(git_remote, "deps.txt")).to eq("A")
               end
