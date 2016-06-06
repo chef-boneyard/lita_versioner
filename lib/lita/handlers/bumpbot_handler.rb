@@ -2,10 +2,11 @@ require "lita"
 require "forwardable"
 require "tmpdir"
 require "fileutils"
+require "shellwords"
+require "set"
 require_relative "../../lita_versioner"
 require_relative "../../lita_versioner/format_helpers"
 require_relative "../../lita_versioner/jenkins_http"
-require "shellwords"
 
 module Lita
   module Handlers
@@ -32,6 +33,7 @@ module Lita
       attr_reader :response
       attr_accessor :http_response
       attr_reader :start_time
+      attr_reader :title
 
       #
       # Unique ID for the handler
@@ -43,8 +45,13 @@ module Lita
         klass.namespace("versioner")
       end
 
-      @@handler_id = 0
-      @@handler_mutex = Mutex.new
+      def self.reset!
+        @@handler_id = 0
+        @@handler_mutex = Mutex.new
+        @@running_handlers = Set.new
+      end
+      reset!
+
       def handler_mutex
         @@handler_mutex
       end
@@ -68,14 +75,9 @@ module Lita
         @project_repo ||= ProjectRepo.new(self)
       end
 
-      def cleanup
+      def remove_sandbox_directory
+        debug("Cleaning up sandbox directory #{sandbox_directory} after successful command ...")
         FileUtils.rm_rf(sandbox_directory)
-        debug("Cleaned up sandbox directory after successful command")
-      end
-
-      @@running_handlers = {}
-      def running_handlers
-        @@running_handlers
       end
 
       #
@@ -128,47 +130,82 @@ module Lita
         File.join(sandbox_directory, "handler.log")
       end
 
+      def title_filename
+        File.join(sandbox_directory, "title.txt")
+      end
+
       #
-      # Callback wrapper for non-command handlers.
+      # Callback wrapper for handlers.
       #
       # @param title The event title.
       # @return whatever the provided block returns.
       #
-      def handle_event(title)
-        raise "Cannot call handle_event or handle_command twice for a single handler! Already running #{running_handlers[self].inspect}, and asked to run #{running_handlers[self].inspect}" if running_handlers[self]
+      def handle(title, response: nil, &block)
+        raise "Cannot call handle_event or handle_command twice for a single handler! Already running #{title.inspect}, and asked to run #{self.title.inspect}" if running_handlers.include?(self)
 
-        running_handlers[self] = title
+        @title = title
         @start_time = Time.now.utc
-        @response = nil
-        debug("Start event #{running_handlers[self]} - handler id #{handler_id} sandbox #{sandbox_directory}")
-        yield
-        cleanup
+        @response = response
+        running_handlers << self
+        create_sandbox_directory
+        IO.write(title_filename, title)
+        instance_eval(&block)
+        debug("Completed #{title} in #{format_duration(Time.now.utc - start_time)}")
+        remove_sandbox_directory
       rescue ErrorAlreadyReported
+        debug("Completed #{title} in #{format_duration(Time.now.utc - start_time)}")
       rescue
-        msg = "Unhandled error while working on \"#{title}\":\n" +
-          "```#{$!}\n#{$!.backtrace.join("\n")}."
+        msg = "Unhandled error during #{title}:\n" +
+          "```#{$!}\n#{$!.backtrace.join("\n")}```."
         error(msg)
+        debug("Completed #{title} in #{format_duration(Time.now.utc - start_time)}")
       ensure
-        debug("Completed event #{running_handlers[self]} in #{format_duration(Time.now.utc - start_time)} - handler id #{handler_id} sandbox #{sandbox_directory}")
         running_handlers.delete(self)
       end
 
       #
       # Run a command (and report the output)
       #
-      def run_command(command, timeout: 3600, **options)
+      def run_command(command, **options)
         command_start_time = Time.now.utc
-        Bundler.with_clean_env do
-          options[:timeout] = timeout
+        command = Shellwords.join(command) if command.is_a?(Array)
 
-          command = Shellwords.join(command) if command.is_a?(Array)
-          debug("`#{command}` starting with #{options}")
-          shellout = Mixlib::ShellOut.new(command, options)
-          shellout.run_command
+        Bundler.with_clean_env do
+          read_thread_exception = nil
+          begin
+            # Listen for output from the command
+            read, write = IO.pipe
+            read_thread = Thread.new do
+              begin
+                buf = ""
+                # We want to read *up to* 32K, but we want to read as quick as we can.
+                while true
+                  begin
+                    read.readpartial(32*1024, buf)
+                    debug(buf)
+                  rescue EOFError
+                    break
+                  end
+                end
+              rescue
+                read_thread_exception = $!
+              end
+            end
+
+            # Start the command
+            debug("`#{command}` starting#{" with #{options.map {|k,v| "#{k}=#{v}"}.join(", ")}" if options}")
+            shellout = Mixlib::ShellOut.new(command, live_stream: write, timeout: 3600, **options)
+            shellout.run_command
+          ensure
+            # Command is finished one way or the other. Close out the pipe and
+            # wait for it to output.
+            write.close if write
+            read_thread.join if read_thread
+          end
+
           debug("Completed `#{command}` with status #{shellout.exitstatus} in #{format_duration(Time.now.utc - command_start_time)}")
           shellout.error!
-          debug("STDOUT:\n```#{shellout.stdout}```\n") if shellout.stdout != ""
-          debug("STDERR:\n```#{shellout.stderr}```\n") if shellout.stderr != ""
+          error!("Read thread exception: #{read_thread_exception}\n#{read_thread_exception.backtrace.map { |l| "  #{l}"}}") if read_thread_exception
           shellout
         end
       end
@@ -256,29 +293,13 @@ module Lita
       private
 
       def handle_command(command, response, **arg_options, &block)
-        raise "Cannot call handle_event or handle_command twice for a single handler! Already running #{running_handlers[self].inspect}, and asked to run #{running_handlers[self].inspect}" if running_handlers[self]
-
-        @start_time = Time.now.utc
-        @response = response
-
-        running_handlers[self] = "command #{command.inspect} from #{response.message.source.user.mention_name}#{response.message.source.room ? " in #{response.message.source.room}" : ""}"
-        debug("Starting #{running_handlers[self]}")
-        begin
+        handle("command #{response.message.body.inspect} from #{response.message.source.user.mention_name}#{response.message.source.room ? " in #{response.message.source.room}" : ""}", response: response) do
           parse_args(command, response, **arg_options)
           instance_exec(*command_args, &block)
-          cleanup
-        rescue ErrorAlreadyReported
-        rescue
-          msg = "Unhandled error while working on \"#{response.message.body}\":\n" +
-            "```#{$!}\n#{$!.backtrace.join("\n")}```."
-          error(msg)
-        ensure
-          debug("Completed #{running_handlers[self]} in #{format_duration(Time.now.utc - start_time)}")
-          running_handlers.delete(self)
         end
       end
 
-      def parse_args(command, response, help: help, project_arg: true, max_args: 0)
+      def parse_args(command, response, help:, project_arg: true, max_args: 0)
         # Strip extra words from the args: response.args will start with
         # "dependencies" if the command is "update dependencies"
         command_words = command.split(/\s+/)

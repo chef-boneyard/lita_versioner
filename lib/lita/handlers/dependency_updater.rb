@@ -42,7 +42,7 @@ module Lita
       # Event: autobump (update dependencies on timer)
       #
       def update_dependencies_from_timer(proj_name)
-        handle_event "autobump timer for #{proj_name}" do
+        handle "autobump timer for #{proj_name}" do
           self.project_name = proj_name
           debug("Running scheduled dependency update for #{project_name}")
           update_dependencies
@@ -59,7 +59,7 @@ module Lita
       FAILURE_NOTIFICATION_QUIET_TIME = 3600
 
       def setup_polling(args)
-        handle_event "DependencyUpdater initial load" do
+        handle "DependencyUpdater initial load" do
           unless config.polling_interval
             debug("Polling is disabled. Dependency updates will run from chat command only")
             return false

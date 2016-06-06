@@ -1,9 +1,11 @@
 module LitaVersioner
   module FormatHelpers
     def how_long_ago(start_time)
-      days, hours = duration.divmod(24)
-      hours, minutes = hours.divmod(60)
-      minutes, seconds = minutes.divmod(60)
+      duration = Time.now.utc - start_time
+      minutes, seconds = duration.divmod(60)
+      hours, minutes = minutes.divmod(60)
+      days, hours = hours.divmod(24)
+      parts = []
       parts << "#{days} day#{days > 1 ? "s" : ""}" if days > 0
       parts << "#{hours} hour#{hours > 1 ? "s" : ""}" if hours > 0
       parts << "#{minutes} minute#{minutes > 1 ? "s" : ""}" if minutes > 0
@@ -19,8 +21,8 @@ module LitaVersioner
     end
 
     def format_duration(duration)
-      hours, minutes = duration.divmod(60)
-      minutes, seconds = minutes.divmod(60)
+      minutes, seconds = duration.divmod(60)
+      hours, minutes = minutes.divmod(60)
       "#{"%.2d" % hours}:#{"%.2d" % minutes}:#{"%.2d" % seconds}"
     end
   end

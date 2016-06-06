@@ -53,10 +53,8 @@ module Lita
       def github_handler(request, response)
         self.http_response = response
 
-        # Handle as two separate events so we see logs if the first one fails ...
-
-        merge_commit_sha = nil
-        handle_event "github event parse #{request.params["payload"]}" do
+        # Filter out events and parse the response
+        handle "received github event #{request.params["payload"]}" do
           payload = JSON.parse(request.params["payload"])
           repository = payload["repository"]["name"]
           event_type = request.env["HTTP_X_GITHUB_EVENT"]
@@ -80,7 +78,6 @@ module Lita
           end
 
           pull_request_url = payload["pull_request"]["html_url"]
-          merge_commit_sha = payload["pull_request"]["merge_commit_sha"]
 
           # If the pull request is merged with some commits
           if payload["action"] != "closed"
@@ -92,16 +89,24 @@ module Lita
             info("Skipping: '#{pull_request_url}'. It was closed without merging any commits.")
             return
           end
-        end
 
-        handle_event "github merged pull request #{pull_request_url} for #{project_name}: #{merge_commit_sha}" do
+          merge_commit_sha = payload["pull_request"]["merge_commit_sha"]
+
           if project_repo.current_sha != merge_commit_sha
             warn("Skipping: '#{pull_request_url}'. Latest master is at SHA #{project_repo.current_sha}, but the pull request merged SHA #{merge_commit_sha}")
             return
           end
 
           info("'#{pull_request_url}' was just merged. Bumping version and submitting a build ...")
-          bump_version_and_trigger_build
+
+          # Bump the build in a new handler so we get a good title
+          parent = self
+          versioner = Versioner.new(robot)
+          versioner.handle "github merged pull request #{pull_request_url} for #{project_name}: #{merge_commit_sha}" do
+            self.http_response = response
+            self.project_name = parent.project_name
+            bump_version_and_trigger_build
+          end
         end
       end
 

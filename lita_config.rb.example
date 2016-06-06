@@ -12,7 +12,6 @@ Lita.configure do |config|
 
   config.robot.log_level = :debug
 
-
   # Global BumpBot configuration.
   # To get your API token:
   # 1. Go to jenkins and log in.
