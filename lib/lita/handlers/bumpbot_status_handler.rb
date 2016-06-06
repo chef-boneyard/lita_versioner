@@ -14,14 +14,13 @@ module Lita
         "Get the list of running handlers in bumpbot",
         project_arg: false
       ) do
-        running_handlers = self.running_handlers.dup
+        running_handlers = self.running_handlers.reject { |handler| handler == self }
         if running_handlers.any?
-          running_handlers.sort_by { |handler| handler.start_time }.reverse_each do |handler, title|
-            info("#{handler.handler_id} #{title}: started #{how_long_ago(handler.start_time)}. <#{config.lita_url}/bumpbot/handlers/#{handler_id}/log|Log> <#{config.lita_url}/bumpbot/handlers/#{handler_id}/download_sandbox|Download Sandbox>")
+          running_handlers.sort_by { |handler| [ handler.start_time, handler.handler_id.to_i ] }.reverse_each do |handler|
+            info("#{handler.title} started #{how_long_ago(handler.start_time)}. <#{config.lita_url}/bumpbot/handlers/#{handler.handler_id}/log|Log> <#{config.lita_url}/bumpbot/handlers/#{handler.handler_id}/download_sandbox|Download Sandbox>")
           end
         else
-          # Technically, this should never happen because we are a running handler, but eh
-          error!("No running handlers!")
+          info("No command or event handlers are running right now.")
         end
       end
 
@@ -29,40 +28,42 @@ module Lita
       # Command: bumpbot sandboxes
       #
       command_route(
-        "bumpbot sandboxes",
-        { "[RANGE]" => "Get the list of sandboxes in bumpbot (corresponds to the list of failed commands). Optional RANGE will get you a list of sandboxes. Default range is 1-5. Starts at 1." },
-        project_arg: false
-      ) do |range="1-5"|
+        "bumpbot handlers",
+        { "[RANGE]" => "Get the list of running and failed handlers in bumpbot (corresponds to the list of failed commands). Optional RANGE will get you a list of sandboxes. Default range is 1-10." },
+        project_arg: false,
+        max_args: 1
+      ) do |range="1-10"|
         raise "Range must be <start index>-<end index>!" unless range =~ /^(\d+)(-)?(\d*)$/
         raise "Range start cannot be 0 (starts at 1!)" if $1 == "0"
+
+        sandboxes = read_sandboxes
+        sandboxes.reject! { |handler_id, handler, title, end_time| handler == self }
+
         if $2 == "-"
-          if $3
-            range = $1.to_i..$2.to_i
+          if $3 == ""
+            range = $1.to_i..sandboxes.size
           else
-            range = $1.to_i..$2.to_i
+            range = $1.to_i..$3.to_i
           end
         else
           range = $1.to_i..$1.to_i
         end
 
-        sandboxes = read_sandboxes
-
         if sandboxes.any?
-          if sandboxes.size > range.max
-            info("Showing sandboxes #{range.min} through #{range.max} of #{sandboxes.size} sandboxes")
-          else
-            info("Showing sandboxes #{range.min} through #{sandboxes.size} (no more sandboxes)")
-          end
-          sandboxes.each do |handler_id, handler, title, end_time|
+          sandboxes.each_with_index do |(handler_id, handler, title, end_time), index|
+            next unless range.include?(index+1)
             if handler
-              status = "running since #{how_long_ago(handler.start_time)}"
+              status = "started #{how_long_ago(handler.start_time)}"
             else
-              status = "finished at #{how_long_ago(mtime)}."
+              status = "failed #{how_long_ago(end_time)}"
             end
-            info("#{handler.handler_id}: #{status}. <#{config.lita_url}/bumpbot/handlers/#{handler_id}/log|Log> <#{config.lita_url}/bumpbot/handlers/#{handler_id}/download_sandbox|Download Sandbox>. `#{title}`. ")
+            info("#{title} #{status}. <#{config.lita_url}/bumpbot/handlers/#{handler_id}/log|Log> <#{config.lita_url}/bumpbot/handlers/#{handler_id}/download_sandbox|Download Sandbox>")
+          end
+          if sandboxes.size > range.max
+            info("This is only handlers #{range.min}-#{range.max} out of #{sandboxes.size}. To show the next 10, say \"handlers #{range.max+1}-#{range.max+11}\".")
           end
         else
-          info("No sandboxes found!")
+          info("The system is not running any handlers, and nothing has failed, so there is no handler history to show.")
         end
       end
 
@@ -73,39 +74,42 @@ module Lita
       def read_sandboxes
         if File.directory?(config.sandbox_directory)
           # Get all sandbox directories
-          sandboxes = Dir.entries(config.sandbox_directory).select { |entry| File.directory?(entry) && entry =~ /^\d+$/ }
+          sandboxes = Dir.entries(config.sandbox_directory).select do |entry|
+            File.directory?(File.join(config.sandbox_directory, entry)) && entry =~ /^\d+$/
+          end
         else
           sandboxes = []
         end
 
         # Get handler, title and end time
         sandboxes.map! do |handler_id|
-          handler,title = running_handlers.find { |handler,title| handler.handler_id == handler_id }
+          handler = running_handlers.find { |handler| handler.handler_id == handler_id }
           if handler
+            title = handler.title
             end_time = Time.now.utc
           else
             # This is not currently running. Get status from disk
-
             # end time is mtime of the logfile
+            title_filename = File.join(config.sandbox_directory, handler_id, "title.txt")
             begin
-              end_time = File.mtime(File.join(config.sandbox_directory, handler_id, "handler.log")).utc
+              end_time = File.mtime(title_filename).utc
+              title = IO.read(title_filename).chomp
             rescue Errno::ENOENT
-            end
-
-            # title is first line of the logfile
-            title = begin
-              line = File.open(File.join(config.sandbox_directory, handler_id)) { |file| file.readline.chomp }
-              # Line is [<TIME> - <debug|error|warn|info>] <line>. Just get <line>
-              line.split("] ", 2)[1] || line
-            rescue Errno::ENOENT
-              "(no logfile)"
+              next
             end
           end
-          [ handler_id.to_i, handler, title, end_time ]
+          [ handler_id, handler, title, end_time ]
+        end
+
+        # Add stuff which doesn't have a sandbox yet
+        running_handlers.each do |running_handler|
+          unless sandboxes.any? { |id,handler,title,end_time| handler == running_handler }
+            sandboxes << [ running_handler.handler_id.to_i, running_handler, running_handler.title, Time.now.utc ]
+          end
         end
 
         # Sort in reverse
-        sandboxes.sort_by! { |handler_id, handler, title, end_time| end_time }
+        sandboxes.sort_by! { |handler_id, handler, title, end_time| [ end_time, handler_id.to_i ] }
         sandboxes.reverse!
 
         sandboxes

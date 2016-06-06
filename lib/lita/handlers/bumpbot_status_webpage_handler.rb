@@ -11,7 +11,7 @@ module Lita
       #
       http.get "/bumpbot/handlers/:id/sandbox/handler.log" do |request, response|
         handler_id = request.env["router.params"][:id]
-        handle_event "Webpage /bumpbot/handlers/#{handler_id}/sandbox/handler.log" do
+        handle "Webpage /bumpbot/handlers/#{handler_id}/sandbox/handler.log" do
           handler = running_handlers.find { |handler| handler.handler_id == handler_id.to_i }
           IO.open(File.join(config.sandbox_directory, "handler.log"), "rb:ASCII-8BIT") do |file|
             response.headers["Content-Type"] = "text/plain"
@@ -32,7 +32,7 @@ module Lita
       #
       http.get "/bumpbot/handlers/:id/sandbox.tgz" do |request, response|
         handler_id = request.env["router.params"][:id]
-        handle_event "Webpage /bumpbot/handlers/#{handler_id}/sandbox.tgz" do
+        handle "Webpage /bumpbot/handlers/#{handler_id}/sandbox.tgz" do
           tarfile = File.join(sandbox_directory, "sandbox.tgz")
           run_command "tar czvf #{tarfile} #{File.join(config.sandbox_directory, handler_id)}"
           response.headers["Content-Type"] = "application/x-compressed"

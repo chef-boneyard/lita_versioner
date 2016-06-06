@@ -9,7 +9,7 @@ module LitaVersioner
       parts << "#{days} day#{days > 1 ? "s" : ""}" if days > 0
       parts << "#{hours} hour#{hours > 1 ? "s" : ""}" if hours > 0
       parts << "#{minutes} minute#{minutes > 1 ? "s" : ""}" if minutes > 0
-      parts << "#{seconds} second#{seconds > 1 ? "s" : ""}" if days > 0
+      parts << "#{seconds.to_i} second#{seconds > 1 ? "s" : ""}" if seconds.to_i > 0
       case parts.size
       when 0
         "just now"

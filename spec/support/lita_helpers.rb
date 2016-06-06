@@ -11,6 +11,7 @@ module LitaHelpers
         allow_any_instance_of(Lita::Handlers::BumpbotHandler).to receive(:source_by_name) { |name| notifications_room }
 
         lita_config = Lita.config.handlers.versioner
+        lita_config.lita_url = "http://localhost:#{Lita.config.http.port}"
         lita_config.jenkins_username = "ci"
         lita_config.jenkins_api_token = "ci_api_token"
         lita_config.trigger_real_builds = true

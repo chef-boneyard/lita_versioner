@@ -28,6 +28,7 @@ module Lita
       config :cache_directory, default: "#{Dir.tmpdir}/lita_versioner"
       config :sandbox_directory, default: "#{Dir.tmpdir}/lita_versioner/sandbox"
       config :debug_lines_in_pm, default: true
+      config :lita_url, required: true
 
       attr_accessor :project_name
       attr_reader :response
@@ -54,6 +55,12 @@ module Lita
 
       def handler_mutex
         @@handler_mutex
+      end
+      def self.running_handlers
+        @@running_handlers
+      end
+      def running_handlers
+        @@running_handlers
       end
 
       # Give the handler a monotonically increasing ID
@@ -112,16 +119,9 @@ module Lita
       end
 
       #
-      # Cache directory for this handler instance to
+      # Cache directory for this handler instance
       #
-      def sandbox_directory
-        @sandbox_directory ||= begin
-          dir = File.join(config.sandbox_directory, handler_id)
-          FileUtils.rm_rf(dir)
-          FileUtils.mkdir_p(dir)
-          dir
-        end
-      end
+      attr_reader :sandbox_directory
 
       #
       # The log file we write messages to for this handler
@@ -148,6 +148,7 @@ module Lita
         @response = response
         running_handlers << self
         create_sandbox_directory
+        debug("Starting #{title}")
         IO.write(title_filename, title)
         instance_eval(&block)
         debug("Completed #{title} in #{format_duration(Time.now.utc - start_time)}")
@@ -155,7 +156,7 @@ module Lita
       rescue ErrorAlreadyReported
         debug("Completed #{title} in #{format_duration(Time.now.utc - start_time)}")
       rescue
-        msg = "Unhandled error during #{title}:\n" +
+        msg = "Unhandled error while #{title}:\n" +
           "```#{$!}\n#{$!.backtrace.join("\n")}```."
         error(msg)
         debug("Completed #{title} in #{format_duration(Time.now.utc - start_time)}")
@@ -293,7 +294,7 @@ module Lita
       private
 
       def handle_command(command, response, **arg_options, &block)
-        handle("command #{response.message.body.inspect} from #{response.message.source.user.mention_name}#{response.message.source.room ? " in #{response.message.source.room}" : ""}", response: response) do
+        handle("handling command #{response.message.body.inspect} from #{response.message.source.user.mention_name}#{response.message.source.room ? " in #{response.message.source.room}" : ""}", response: response) do
           parse_args(command, response, **arg_options)
           instance_exec(*command_args, &block)
         end
@@ -401,6 +402,15 @@ module Lita
         source = Lita::Source.new(room: room) if room
         log_each_line(:error, "Unable to resolve ##{channel_name}.") unless source
         source
+      end
+
+      def create_sandbox_directory
+        @sandbox_directory = begin
+          dir = File.join(config.sandbox_directory, handler_id)
+          FileUtils.rm_rf(dir)
+          FileUtils.mkdir_p(dir)
+          dir
+        end
       end
 
       Lita.register_handler(self)

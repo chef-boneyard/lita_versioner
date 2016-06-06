@@ -1,7 +1,11 @@
 # Uncomment the following lines once Slack tokens are added below
 # require "lita-slack"
 Lita.configure do |config|
+  # Redis config
   config.redis[:host] = "redis"
+
+  # HTTP config
+  config.lita_url = "http://localhost:#{config.http.port}"
 
   # Shell config: local config.
   config.robot.adapter = :shell
