@@ -8,11 +8,13 @@ module Lita
   module Handlers
     class Versioner < BumpbotHandler
 
-      # Incoming github events
+      #
+      # Event: github events (https://developer.github.com/v3/activity/events/types/#pullrequestevent)
+      #
       http.post "/github_handler", :github_handler
 
       #
-      # User commands
+      # Command: build PROJECT [GIT_REF=master]
       #
       command_route(
         "build",
@@ -30,6 +32,9 @@ module Lita
         info("Kicked off a build for '#{pipeline}' at ref '#{git_ref}'.") if success
       end
 
+      #
+      # Command: bump PROJECT
+      #
       command_route(
         "bump",
         "Bumps the version of PROJECT and starts a build."
@@ -37,16 +42,26 @@ module Lita
         bump_version_and_trigger_build
       end
 
+
+      #
+      # Helpers (private)
+      #
+
       #
       # Handle incoming github events
       #
       def github_handler(request, response)
         self.http_response = response
-        handle_event "github event" do
+
+        # Handle as two separate events so we see logs if the first one fails ...
+
+        merge_commit_sha = nil
+        handle_event "github event parse #{request.params["payload"]}" do
           payload = JSON.parse(request.params["payload"])
           repository = payload["repository"]["name"]
+          event_type = request.env["HTTP_X_GITHUB_EVENT"]
 
-          self.project_name = projects.each_key.find do |name|
+          self.project_name = projects.keys.find do |name|
             repo = File.basename(projects[name][:github_url])
             repo = repo[0..-4] if repo.end_with?(".git")
             repo == repository
@@ -56,8 +71,6 @@ module Lita
             error!("Repository '#{repository}' is not monitored by versioner!")
           end
 
-          event_type = request.env["HTTP_X_GITHUB_EVENT"]
-
           debug("Processing '#{event_type}' event for '#{repository}'.")
 
           # https://developer.github.com/v3/activity/events/types/#pullrequestevent
@@ -66,23 +79,28 @@ module Lita
             return
           end
 
+          pull_request_url = payload["pull_request"]["html_url"]
+          merge_commit_sha = payload["pull_request"]["merge_commit_sha"]
+
           # If the pull request is merged with some commits
           if payload["action"] != "closed"
-            debug("Skipping: '#{payload["pull_request"]["html_url"]}' Action: '#{payload["action"]}' Merged? '#{payload["pull_request"]["merged"]}'")
+            debug("Skipping: '#{pull_request_url}' Action: '#{payload["action"]}' Merged? '#{payload["pull_request"]["merged"]}'")
             return
           end
 
           unless payload["pull_request"]["merged"]
-            info("Skipping: '#{payload["pull_request"]["html_url"]}'. It was closed without merging any commits.")
+            info("Skipping: '#{pull_request_url}'. It was closed without merging any commits.")
+            return
+          end
+        end
+
+        handle_event "github merged pull request #{pull_request_url} for #{project_name}: #{merge_commit_sha}" do
+          if project_repo.current_sha != merge_commit_sha
+            warn("Skipping: '#{pull_request_url}'. Latest master is at SHA #{project_repo.current_sha}, but the pull request merged SHA #{merge_commit_sha}")
             return
           end
 
-          if project_repo.current_sha != payload["pull_request"]["merge_commit_sha"]
-            warn("Skipping: '#{payload["pull_request"]["html_url"]}'. Latest master is at SHA #{project_repo.current_sha}, but the pull request merged SHA #{payload["pull_request"]["merge_commit_sha"]}")
-            return
-          end
-
-          info("'#{payload["pull_request"]["html_url"]}' was just merged. Bumping version and submitting a build ...")
+          info("'#{pull_request_url}' was just merged. Bumping version and submitting a build ...")
           bump_version_and_trigger_build
         end
       end
@@ -102,8 +120,9 @@ module Lita
         # we return the version we bumped to
         project_repo.read_version
       end
-    end
 
-    Lita.register_handler(Versioner)
+      template_root File.expand_path("../../templates", __FILE__)
+      Lita.register_handler(self)
+    end
   end
 end

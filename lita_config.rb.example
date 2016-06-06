@@ -37,17 +37,17 @@ Lita.configure do |config|
     "chef" => {
       pipeline: "chef-trigger-release",
       github_url: "https://github.com/chef/chef.git",
-      version_bump_command: "bundle install && bundle exec rake version:bump && git checkout .bundle/config",
-      version_show_command: "bundle exec rake version:show",
-      dependency_update_command: "bundle install && bundle exec rake dependencies && git checkout .bundle/config",
+      version_bump_command: "ci/version_bump.sh",
+      version_show_command: "ci/version_show.sh",
+      dependency_update_command: "ci/dependency_update.sh",
       inform_channel: "workflow-pool",
     },
     "chefdk" => {
       pipeline: "chefdk-trigger-release",
       github_url: "https://github.com/chef/chef-dk.git",
-      version_bump_command: "bundle install && bundle exec rake version:bump && git checkout .bundle/config",
-      version_show_command: "bundle exec rake version:show",
-      dependency_update_command: "bundle install && bundle exec rake dependencies && git checkout .bundle/config",
+      version_bump_command: "ci/version_bump.sh",
+      version_show_command: "ci/version_show.sh",
+      dependency_update_command: "ci/dependency_update.sh",
       inform_channel: "workflow-pool",
     },
     "harmony" => {

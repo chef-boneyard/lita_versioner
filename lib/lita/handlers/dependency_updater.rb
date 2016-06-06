@@ -11,14 +11,8 @@ module Lita
   module Handlers
     class DependencyUpdater < BumpbotHandler
 
-      DEPENDENCY_BRANCH_NAME = "auto_dependency_bump_test".freeze
-
-      FAILURE_NOTIFICATION_QUIET_TIME = 3600
-
-      on :loaded, :setup_polling
-
       #
-      # Chat commands
+      # Command: update dependencies PROJECT
       #
       command_route(
         "update dependencies",
@@ -28,6 +22,9 @@ module Lita
         update_dependencies
       end
 
+      #
+      # Command: reset dependency updates PROJECT
+      #
       command_route(
         "reset dependency updates",
         "Forget failed dependency update builds (fixes 'waiting for the quiet period to expire before building again')."
@@ -36,16 +33,33 @@ module Lita
         info("Deleted local branch #{DEPENDENCY_BRANCH_NAME} of #{project_name}.")
       end
 
+      #
+      # Event: load dependency updater and set up polling on start
+      #
+      on :loaded, :setup_polling
+
+      #
+      # Event: autobump (update dependencies on timer)
+      #
       def update_dependencies_from_timer(proj_name)
-        handle_event "autobump timer" do
+        handle_event "autobump timer for #{proj_name}" do
           self.project_name = proj_name
           debug("Running scheduled dependency update for #{project_name}")
           update_dependencies
         end
       end
 
+      #
+      # Helpers (private)
+      #
+
+      DEPENDENCY_BRANCH_NAME = "auto_dependency_bump_test".freeze
+
+      FAILURE_NOTIFICATION_RATE_LIMIT_FILE = "./cache/failure_notification_rate_limit".freeze
+      FAILURE_NOTIFICATION_QUIET_TIME = 3600
+
       def setup_polling(args)
-        handle_event "DependencyUpdater load" do
+        handle_event "DependencyUpdater initial load" do
           unless config.polling_interval
             debug("Polling is disabled. Dependency updates will run from chat command only")
             return false
@@ -122,7 +136,8 @@ module Lita
           error!(message)
         end
       end
+
+      Lita.register_handler(self)
     end
-    Lita.register_handler(DependencyUpdater)
   end
 end

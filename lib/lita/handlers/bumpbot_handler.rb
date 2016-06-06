@@ -3,6 +3,7 @@ require "forwardable"
 require "tmpdir"
 require "fileutils"
 require_relative "../../lita_versioner"
+require_relative "../../lita_versioner/format_helpers"
 require_relative "../../lita_versioner/jenkins_http"
 require "shellwords"
 
@@ -12,6 +13,7 @@ module Lita
       # include LitaVersioner so we get the constants from it (so we can use the
       # classes easily here and in subclasses)
       include LitaVersioner
+      include LitaVersioner::FormatHelpers
 
       namespace "versioner"
 
@@ -27,9 +29,9 @@ module Lita
       config :debug_lines_in_pm, default: true
 
       attr_accessor :project_name
-      attr_reader :handler_name
       attr_reader :response
       attr_accessor :http_response
+      attr_reader :start_time
 
       #
       # Unique ID for the handler
@@ -41,17 +43,26 @@ module Lita
         klass.namespace("versioner")
       end
 
-      @@handler_mutex = Mutex.new
       @@handler_id = 0
+      @@handler_mutex = Mutex.new
+      def handler_mutex
+        @@handler_mutex
+      end
 
       # Give the handler a monotonically increasing ID
       def initialize(*args)
         super
-        @@handler_mutex.synchronize do
+        @log_mutex = Mutex.new
+        handler_mutex.synchronize do
           @@handler_id += 1
           @handler_id = @@handler_id.to_s
         end
       end
+
+      #
+      # Synchronizes log access so we don't get lines on top of each other
+      #
+      attr_reader :log_mutex
 
       def project_repo
         @project_repo ||= ProjectRepo.new(self)
@@ -59,6 +70,12 @@ module Lita
 
       def cleanup
         FileUtils.rm_rf(sandbox_directory)
+        debug("Cleaned up sandbox directory after successful command")
+      end
+
+      @@running_handlers = {}
+      def running_handlers
+        @@running_handlers
       end
 
       #
@@ -73,30 +90,22 @@ module Lita
       #     'EXTRA_ARG_NAME' => 'some usage',
       #     'DIFFERENT_ARG SEQUENCE HERE' => 'different usage'
       #   }
+      # @param project_arg [Boolean] Whether the first arg should be PROJECT or not. Default: true
       # @param max_args [Int] Maximum number of extra arguments that this command takes.
       #
-      def self.command_route(command, help, max_args: 0, &block)
+      def self.command_route(command, help, project_arg: true, max_args: 0, &block)
         help = { "" => help } unless help.is_a?(Hash)
 
         complete_help = {}
         help.each do |arg, text|
-          complete_help["#{command} PROJECT #{arg}".strip] = text
+          if project_arg
+            complete_help["#{command} PROJECT #{arg}".strip] = text
+          else
+            complete_help["#{command} #{arg}".strip] = text
+          end
         end
         route(/^#{command}(\s|$)/, nil, command: true, help: complete_help) do |response|
-          # This block will be instance-evaled in the context of the handler
-          # instance - so we can set instance variables etc.
-          begin
-            init_command(command, response, complete_help, max_args)
-            instance_exec(*command_args, &block)
-            cleanup
-          rescue ErrorAlreadyReported
-            debug("Sandbox: #{sandbox_directory}")
-          rescue
-            msg = "Unhandled error while working on \"#{response.message.body}\":\n" +
-              "```#{$!}\n#{$!.backtrace.join("\n")}```."
-            error(msg)
-            debug("Sandbox: #{sandbox_directory}")
-          end
+          handle_command(command, response, help: complete_help, project_arg: project_arg, max_args: max_args, &block)
         end
       end
 
@@ -113,34 +122,52 @@ module Lita
       end
 
       #
+      # The log file we write messages to for this handler
+      #
+      def logfile
+        File.join(sandbox_directory, "handler.log")
+      end
+
+      #
       # Callback wrapper for non-command handlers.
       #
       # @param title The event title.
       # @return whatever the provided block returns.
       #
       def handle_event(title)
-        init_event(title)
+        raise "Cannot call handle_event or handle_command twice for a single handler! Already running #{running_handlers[self].inspect}, and asked to run #{running_handlers[self].inspect}" if running_handlers[self]
+
+        running_handlers[self] = title
+        @start_time = Time.now.utc
+        @response = nil
+        debug("Start event #{running_handlers[self]} - handler id #{handler_id} sandbox #{sandbox_directory}")
         yield
         cleanup
       rescue ErrorAlreadyReported
-        debug("Sandbox: #{sandbox_directory}")
       rescue
         msg = "Unhandled error while working on \"#{title}\":\n" +
           "```#{$!}\n#{$!.backtrace.join("\n")}."
-        debug("Sandbox: #{sandbox_directory}")
         error(msg)
+      ensure
+        debug("Completed event #{running_handlers[self]} in #{format_duration(Time.now.utc - start_time)} - handler id #{handler_id} sandbox #{sandbox_directory}")
+        running_handlers.delete(self)
       end
 
+      #
+      # Run a command (and report the output)
+      #
       def run_command(command, timeout: 3600, **options)
+        command_start_time = Time.now.utc
         Bundler.with_clean_env do
           options[:timeout] = timeout
 
           command = Shellwords.join(command) if command.is_a?(Array)
-          debug("Running \"#{command}\" with #{options}")
+          debug("`#{command}` starting with #{options}")
           shellout = Mixlib::ShellOut.new(command, options)
           shellout.run_command
+          debug("Completed `#{command}` with status #{shellout.exitstatus} in #{format_duration(Time.now.utc - command_start_time)}")
           shellout.error!
-          debug("STDOUT:\n```#{shellout.stdout}```\n")
+          debug("STDOUT:\n```#{shellout.stdout}```\n") if shellout.stdout != ""
           debug("STDERR:\n```#{shellout.stderr}```\n") if shellout.stderr != ""
           shellout
         end
@@ -228,34 +255,49 @@ module Lita
 
       private
 
-      #
-      # Initialize this handler as a chat command handler.
-      #
-      def init_command(command, response, help, max_args)
-        command_words = command.split(/\s+/)
-        @handler_name = command
+      def handle_command(command, response, **arg_options, &block)
+        raise "Cannot call handle_event or handle_command twice for a single handler! Already running #{running_handlers[self].inspect}, and asked to run #{running_handlers[self].inspect}" if running_handlers[self]
+
+        @start_time = Time.now.utc
         @response = response
-        # strip extra words from the args, like "update dependencies"
-        args = response.args[command_words.size - 1..-1]
-        error!("No project specified!\n#{usage(help)}") if args.empty?
-        @project_name = args.shift
-        @command_args = args
-        debug("Handling command #{command.inspect}")
-        unless project
-          error!("Invalid project #{project_name}. Valid projects: #{projects.keys.join(", ")}.\n#{usage(help)}")
-        end
-        if command_args.size > max_args
-          error!("Too many arguments (#{command_args.size + 1} for #{max_args + 1})!\n#{usage(help)}")
+
+        running_handlers[self] = "command #{command.inspect} from #{response.message.source.user.mention_name}#{response.message.source.room ? " in #{response.message.source.room}" : ""}"
+        debug("Starting #{running_handlers[self]}")
+        begin
+          parse_args(command, response, **arg_options)
+          instance_exec(*command_args, &block)
+          cleanup
+        rescue ErrorAlreadyReported
+        rescue
+          msg = "Unhandled error while working on \"#{response.message.body}\":\n" +
+            "```#{$!}\n#{$!.backtrace.join("\n")}```."
+          error(msg)
+        ensure
+          debug("Completed #{running_handlers[self]} in #{format_duration(Time.now.utc - start_time)}")
+          running_handlers.delete(self)
         end
       end
 
-      #
-      # Initialize this handler as a chat command handler.
-      #
-      def init_event(name)
-        @handler_name = name
-        @response = nil
-        debug("Handling event #{name}")
+      def parse_args(command, response, help: help, project_arg: true, max_args: 0)
+        # Strip extra words from the args: response.args will start with
+        # "dependencies" if the command is "update dependencies"
+        command_words = command.split(/\s+/)
+        args = response.args[command_words.size - 1..-1]
+
+        if project_arg
+          # Grab the project name and command args
+          @project_name = args.shift
+          error!("No project specified!\n#{usage(help)}") unless project_name
+          unless project
+            error!("Invalid project #{project_name}. Valid projects: #{projects.keys.join(", ")}.\n#{usage(help)}")
+          end
+        end
+
+        @command_args = args
+
+        if command_args.size > max_args
+          error!("Too many arguments (#{command_args.size + (project_arg ? 1 : 0)} for #{max_args + (project_arg ? 1 : 0)})!\n#{usage(help)}")
+        end
       end
 
       #
@@ -268,16 +310,39 @@ module Lita
         usage << usage_lines.join("\n")
       end
 
+      attr_accessor :last_log_time
+      attr_accessor :last_log_level
+
       #
       # Log to the default Lita logger with a custom per-line prefix.
       #
       # This is help identify what command or handler a particular message came
       # from when reading syslog.
       #
-      def log_each_line(log_method, message)
-        prefix = "<#{handler_name}>{#{project_name || "unknown"}} "
+      def log_each_line(log_level, message)
+        time = Time.now.utc.to_s
+        log_mutex.synchronize do
+          File.open(logfile, "a") do |file|
+            log_time = time.to_s
+            justified_log_level = log_level.to_s.upcase.ljust(5)
+            message.to_s.each_line do |line|
+              # After the first line of the output, emit spaces for easier reading
+              if log_time == last_log_time
+                log_time = " " * log_time.size if log_time == last_log_time
+              else
+                self.last_log_time = log_time
+              end
+              if log_level == justified_log_level
+                justified_log_level = " " * justified_log_level.size if justified_log_level == last_log_level
+              else
+                self.last_log_level = justified_log_level
+              end
+              file.puts("[#{log_time} #{justified_log_level}] #{line.chomp}")
+            end
+          end
+        end
         message.to_s.each_line do |l|
-          log.public_send(log_method, "#{prefix}#{l.chomp}")
+          log.public_send(log_level, "[#{handler_id}] #{l.chomp}")
         end
       end
 
@@ -316,8 +381,8 @@ module Lita
         log_each_line(:error, "Unable to resolve ##{channel_name}.") unless source
         source
       end
-    end
 
-    Lita.register_handler(BumpbotHandler)
+      Lita.register_handler(self)
+    end
   end
 end
