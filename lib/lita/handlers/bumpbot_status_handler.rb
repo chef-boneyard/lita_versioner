@@ -61,7 +61,7 @@ module Lita
                 status = "succeeded #{how_long_ago(start_time)} after #{format_duration(end_time - start_time)}"
               end
             else
-              status = "running since #{how_long_ago(handler.start_time)}"
+              status = "running since #{how_long_ago(start_time)}"
             end
             info("#{title} #{status}. <#{config.lita_url}/bumpbot/handlers/#{handler_id}/log|Log> <#{config.lita_url}/bumpbot/handlers/#{handler_id}/download_sandbox|Download Sandbox>")
           end
