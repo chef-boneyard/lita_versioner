@@ -4,9 +4,6 @@ Lita.configure do |config|
   # Redis config
   config.redis[:host] = "redis"
 
-  # HTTP config
-  config.lita_url = "http://localhost:#{config.http.port}"
-
   # Shell config: local config.
   config.robot.adapter = :shell
 
@@ -15,6 +12,9 @@ Lita.configure do |config|
   # config.adapters.slack.token = "<SLACK TOKEN HERE>"
 
   config.robot.log_level = :debug
+
+  # HTTP config
+  config.handlers.versioner.lita_url = "http://localhost:#{config.http.port}"
 
   # Global BumpBot configuration.
   # To get your API token:
