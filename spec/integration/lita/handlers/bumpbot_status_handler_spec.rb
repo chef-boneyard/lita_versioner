@@ -93,7 +93,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         handler_thread.join
 
         expect(reply_string).to eq(strip_eom_block(<<-EOM))
-          handling command "test wait" from Test User running since just now. <http://localhost:8080/bumpbot/handlers/1/log|Log> <http://localhost:8080/bumpbot/handlers/1/download_sandbox|Download Sandbox>
+          handling command "test wait" from Test User running since just now. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
         EOM
       end
 
@@ -104,7 +104,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         handler_thread.join
 
         expect(reply_string).to eq(strip_eom_block(<<-EOM))
-          handling command "test wait" from Test User running since 2 seconds ago. <http://localhost:8080/bumpbot/handlers/1/log|Log> <http://localhost:8080/bumpbot/handlers/1/download_sandbox|Download Sandbox>
+          handling command "test wait" from Test User running since 2 seconds ago. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
         EOM
       end
 
@@ -115,7 +115,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         handler_thread.join
 
         expect(reply_string).to eq(strip_eom_block(<<-EOM))
-          handling command "test wait" from Test User running since just now. <http://localhost:8080/bumpbot/handlers/1/log|Log> <http://localhost:8080/bumpbot/handlers/1/download_sandbox|Download Sandbox>
+          handling command "test wait" from Test User running since just now. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
         EOM
       end
 
@@ -126,7 +126,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         handler_thread.join
 
         expect(reply_string).to eq(strip_eom_block(<<-EOM))
-          handling command "test wait" from Test User running since 2 seconds ago. <http://localhost:8080/bumpbot/handlers/1/log|Log> <http://localhost:8080/bumpbot/handlers/1/download_sandbox|Download Sandbox>
+          handling command "test wait" from Test User running since 2 seconds ago. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
         EOM
       end
 
@@ -166,7 +166,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         send_command("bumpbot handlers")
 
         expect(reply_string).to eq(strip_eom_block(<<-EOM))
-          handling command "test command" from Test User succeeded just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/1/log|Log> <http://localhost:8080/bumpbot/handlers/1/download_sandbox|Download Sandbox>
+          handling command "test command" from Test User succeeded just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
         EOM
       end
 
@@ -200,7 +200,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
 
         expect(reply_string).to eq(strip_eom_block(<<-EOM))
           **ERROR:** failed_miserably
-          handling command "test command failed_miserably" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/1/log|Log> <http://localhost:8080/bumpbot/handlers/1/download_sandbox|Download Sandbox>
+          handling command "test command failed_miserably" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
         EOM
       end
 
@@ -212,8 +212,8 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         expect(reply_string).to eq(strip_eom_block(<<-EOM))
           **ERROR:** failed_miserably
           **ERROR:** failed_just_now
-          handling command "test command failed_just_now" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/2/log|Log> <http://localhost:8080/bumpbot/handlers/2/download_sandbox|Download Sandbox>
-          handling command "test command failed_miserably" from Test User failed 2 seconds ago after 00:00:00. <http://localhost:8080/bumpbot/handlers/1/log|Log> <http://localhost:8080/bumpbot/handlers/1/download_sandbox|Download Sandbox>
+          handling command "test command failed_just_now" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/2/handler.log|Log> <http://localhost:8080/bumpbot/handlers/2/sandbox.tgz|Download Sandbox>
+          handling command "test command failed_miserably" from Test User failed 2 seconds ago after 00:00:00. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
         EOM
       end
 
@@ -254,16 +254,16 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
           **ERROR:** failed13
           **ERROR:** failed14
           **ERROR:** failed15
-          handling command "test command failed15" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/15/log|Log> <http://localhost:8080/bumpbot/handlers/15/download_sandbox|Download Sandbox>
-          handling command "test command failed14" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/14/log|Log> <http://localhost:8080/bumpbot/handlers/14/download_sandbox|Download Sandbox>
-          handling command "test command failed13" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/13/log|Log> <http://localhost:8080/bumpbot/handlers/13/download_sandbox|Download Sandbox>
-          handling command "test command failed12" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/12/log|Log> <http://localhost:8080/bumpbot/handlers/12/download_sandbox|Download Sandbox>
-          handling command "test command failed11" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/11/log|Log> <http://localhost:8080/bumpbot/handlers/11/download_sandbox|Download Sandbox>
-          handling command "test command failed10" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/10/log|Log> <http://localhost:8080/bumpbot/handlers/10/download_sandbox|Download Sandbox>
-          handling command "test command failed9" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/9/log|Log> <http://localhost:8080/bumpbot/handlers/9/download_sandbox|Download Sandbox>
-          handling command "test command failed8" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/8/log|Log> <http://localhost:8080/bumpbot/handlers/8/download_sandbox|Download Sandbox>
-          handling command "test command failed7" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/7/log|Log> <http://localhost:8080/bumpbot/handlers/7/download_sandbox|Download Sandbox>
-          handling command "test command failed6" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/6/log|Log> <http://localhost:8080/bumpbot/handlers/6/download_sandbox|Download Sandbox>
+          handling command "test command failed15" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/15/handler.log|Log> <http://localhost:8080/bumpbot/handlers/15/sandbox.tgz|Download Sandbox>
+          handling command "test command failed14" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/14/handler.log|Log> <http://localhost:8080/bumpbot/handlers/14/sandbox.tgz|Download Sandbox>
+          handling command "test command failed13" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/13/handler.log|Log> <http://localhost:8080/bumpbot/handlers/13/sandbox.tgz|Download Sandbox>
+          handling command "test command failed12" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/12/handler.log|Log> <http://localhost:8080/bumpbot/handlers/12/sandbox.tgz|Download Sandbox>
+          handling command "test command failed11" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/11/handler.log|Log> <http://localhost:8080/bumpbot/handlers/11/sandbox.tgz|Download Sandbox>
+          handling command "test command failed10" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/10/handler.log|Log> <http://localhost:8080/bumpbot/handlers/10/sandbox.tgz|Download Sandbox>
+          handling command "test command failed9" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/9/handler.log|Log> <http://localhost:8080/bumpbot/handlers/9/sandbox.tgz|Download Sandbox>
+          handling command "test command failed8" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/8/handler.log|Log> <http://localhost:8080/bumpbot/handlers/8/sandbox.tgz|Download Sandbox>
+          handling command "test command failed7" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/7/handler.log|Log> <http://localhost:8080/bumpbot/handlers/7/sandbox.tgz|Download Sandbox>
+          handling command "test command failed6" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/6/handler.log|Log> <http://localhost:8080/bumpbot/handlers/6/sandbox.tgz|Download Sandbox>
           This is only handlers 1-10 out of 15. To show the next 10, say "handlers 11-21".
         EOM
       end
@@ -287,21 +287,21 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
           **ERROR:** failed13
           **ERROR:** failed14
           **ERROR:** failed15
-          handling command "test command failed15" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/15/log|Log> <http://localhost:8080/bumpbot/handlers/15/download_sandbox|Download Sandbox>
-          handling command "test command failed14" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/14/log|Log> <http://localhost:8080/bumpbot/handlers/14/download_sandbox|Download Sandbox>
-          handling command "test command failed13" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/13/log|Log> <http://localhost:8080/bumpbot/handlers/13/download_sandbox|Download Sandbox>
-          handling command "test command failed12" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/12/log|Log> <http://localhost:8080/bumpbot/handlers/12/download_sandbox|Download Sandbox>
-          handling command "test command failed11" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/11/log|Log> <http://localhost:8080/bumpbot/handlers/11/download_sandbox|Download Sandbox>
-          handling command "test command failed10" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/10/log|Log> <http://localhost:8080/bumpbot/handlers/10/download_sandbox|Download Sandbox>
-          handling command "test command failed9" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/9/log|Log> <http://localhost:8080/bumpbot/handlers/9/download_sandbox|Download Sandbox>
-          handling command "test command failed8" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/8/log|Log> <http://localhost:8080/bumpbot/handlers/8/download_sandbox|Download Sandbox>
-          handling command "test command failed7" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/7/log|Log> <http://localhost:8080/bumpbot/handlers/7/download_sandbox|Download Sandbox>
-          handling command "test command failed6" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/6/log|Log> <http://localhost:8080/bumpbot/handlers/6/download_sandbox|Download Sandbox>
-          handling command "test command failed5" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/5/log|Log> <http://localhost:8080/bumpbot/handlers/5/download_sandbox|Download Sandbox>
-          handling command "test command failed4" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/4/log|Log> <http://localhost:8080/bumpbot/handlers/4/download_sandbox|Download Sandbox>
-          handling command "test command failed3" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/3/log|Log> <http://localhost:8080/bumpbot/handlers/3/download_sandbox|Download Sandbox>
-          handling command "test command failed2" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/2/log|Log> <http://localhost:8080/bumpbot/handlers/2/download_sandbox|Download Sandbox>
-          handling command "test command failed1" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/1/log|Log> <http://localhost:8080/bumpbot/handlers/1/download_sandbox|Download Sandbox>
+          handling command "test command failed15" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/15/handler.log|Log> <http://localhost:8080/bumpbot/handlers/15/sandbox.tgz|Download Sandbox>
+          handling command "test command failed14" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/14/handler.log|Log> <http://localhost:8080/bumpbot/handlers/14/sandbox.tgz|Download Sandbox>
+          handling command "test command failed13" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/13/handler.log|Log> <http://localhost:8080/bumpbot/handlers/13/sandbox.tgz|Download Sandbox>
+          handling command "test command failed12" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/12/handler.log|Log> <http://localhost:8080/bumpbot/handlers/12/sandbox.tgz|Download Sandbox>
+          handling command "test command failed11" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/11/handler.log|Log> <http://localhost:8080/bumpbot/handlers/11/sandbox.tgz|Download Sandbox>
+          handling command "test command failed10" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/10/handler.log|Log> <http://localhost:8080/bumpbot/handlers/10/sandbox.tgz|Download Sandbox>
+          handling command "test command failed9" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/9/handler.log|Log> <http://localhost:8080/bumpbot/handlers/9/sandbox.tgz|Download Sandbox>
+          handling command "test command failed8" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/8/handler.log|Log> <http://localhost:8080/bumpbot/handlers/8/sandbox.tgz|Download Sandbox>
+          handling command "test command failed7" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/7/handler.log|Log> <http://localhost:8080/bumpbot/handlers/7/sandbox.tgz|Download Sandbox>
+          handling command "test command failed6" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/6/handler.log|Log> <http://localhost:8080/bumpbot/handlers/6/sandbox.tgz|Download Sandbox>
+          handling command "test command failed5" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/5/handler.log|Log> <http://localhost:8080/bumpbot/handlers/5/sandbox.tgz|Download Sandbox>
+          handling command "test command failed4" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/4/handler.log|Log> <http://localhost:8080/bumpbot/handlers/4/sandbox.tgz|Download Sandbox>
+          handling command "test command failed3" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/3/handler.log|Log> <http://localhost:8080/bumpbot/handlers/3/sandbox.tgz|Download Sandbox>
+          handling command "test command failed2" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/2/handler.log|Log> <http://localhost:8080/bumpbot/handlers/2/sandbox.tgz|Download Sandbox>
+          handling command "test command failed1" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
         EOM
       end
 
@@ -324,20 +324,20 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
           **ERROR:** failed13
           **ERROR:** failed14
           **ERROR:** failed15
-          handling command "test command failed14" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/14/log|Log> <http://localhost:8080/bumpbot/handlers/14/download_sandbox|Download Sandbox>
-          handling command "test command failed13" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/13/log|Log> <http://localhost:8080/bumpbot/handlers/13/download_sandbox|Download Sandbox>
-          handling command "test command failed12" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/12/log|Log> <http://localhost:8080/bumpbot/handlers/12/download_sandbox|Download Sandbox>
-          handling command "test command failed11" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/11/log|Log> <http://localhost:8080/bumpbot/handlers/11/download_sandbox|Download Sandbox>
-          handling command "test command failed10" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/10/log|Log> <http://localhost:8080/bumpbot/handlers/10/download_sandbox|Download Sandbox>
-          handling command "test command failed9" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/9/log|Log> <http://localhost:8080/bumpbot/handlers/9/download_sandbox|Download Sandbox>
-          handling command "test command failed8" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/8/log|Log> <http://localhost:8080/bumpbot/handlers/8/download_sandbox|Download Sandbox>
-          handling command "test command failed7" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/7/log|Log> <http://localhost:8080/bumpbot/handlers/7/download_sandbox|Download Sandbox>
-          handling command "test command failed6" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/6/log|Log> <http://localhost:8080/bumpbot/handlers/6/download_sandbox|Download Sandbox>
-          handling command "test command failed5" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/5/log|Log> <http://localhost:8080/bumpbot/handlers/5/download_sandbox|Download Sandbox>
-          handling command "test command failed4" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/4/log|Log> <http://localhost:8080/bumpbot/handlers/4/download_sandbox|Download Sandbox>
-          handling command "test command failed3" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/3/log|Log> <http://localhost:8080/bumpbot/handlers/3/download_sandbox|Download Sandbox>
-          handling command "test command failed2" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/2/log|Log> <http://localhost:8080/bumpbot/handlers/2/download_sandbox|Download Sandbox>
-          handling command "test command failed1" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/1/log|Log> <http://localhost:8080/bumpbot/handlers/1/download_sandbox|Download Sandbox>
+          handling command "test command failed14" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/14/handler.log|Log> <http://localhost:8080/bumpbot/handlers/14/sandbox.tgz|Download Sandbox>
+          handling command "test command failed13" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/13/handler.log|Log> <http://localhost:8080/bumpbot/handlers/13/sandbox.tgz|Download Sandbox>
+          handling command "test command failed12" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/12/handler.log|Log> <http://localhost:8080/bumpbot/handlers/12/sandbox.tgz|Download Sandbox>
+          handling command "test command failed11" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/11/handler.log|Log> <http://localhost:8080/bumpbot/handlers/11/sandbox.tgz|Download Sandbox>
+          handling command "test command failed10" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/10/handler.log|Log> <http://localhost:8080/bumpbot/handlers/10/sandbox.tgz|Download Sandbox>
+          handling command "test command failed9" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/9/handler.log|Log> <http://localhost:8080/bumpbot/handlers/9/sandbox.tgz|Download Sandbox>
+          handling command "test command failed8" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/8/handler.log|Log> <http://localhost:8080/bumpbot/handlers/8/sandbox.tgz|Download Sandbox>
+          handling command "test command failed7" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/7/handler.log|Log> <http://localhost:8080/bumpbot/handlers/7/sandbox.tgz|Download Sandbox>
+          handling command "test command failed6" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/6/handler.log|Log> <http://localhost:8080/bumpbot/handlers/6/sandbox.tgz|Download Sandbox>
+          handling command "test command failed5" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/5/handler.log|Log> <http://localhost:8080/bumpbot/handlers/5/sandbox.tgz|Download Sandbox>
+          handling command "test command failed4" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/4/handler.log|Log> <http://localhost:8080/bumpbot/handlers/4/sandbox.tgz|Download Sandbox>
+          handling command "test command failed3" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/3/handler.log|Log> <http://localhost:8080/bumpbot/handlers/3/sandbox.tgz|Download Sandbox>
+          handling command "test command failed2" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/2/handler.log|Log> <http://localhost:8080/bumpbot/handlers/2/sandbox.tgz|Download Sandbox>
+          handling command "test command failed1" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
         EOM
       end
 
@@ -360,11 +360,11 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
           **ERROR:** failed13
           **ERROR:** failed14
           **ERROR:** failed15
-          handling command "test command failed5" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/5/log|Log> <http://localhost:8080/bumpbot/handlers/5/download_sandbox|Download Sandbox>
-          handling command "test command failed4" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/4/log|Log> <http://localhost:8080/bumpbot/handlers/4/download_sandbox|Download Sandbox>
-          handling command "test command failed3" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/3/log|Log> <http://localhost:8080/bumpbot/handlers/3/download_sandbox|Download Sandbox>
-          handling command "test command failed2" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/2/log|Log> <http://localhost:8080/bumpbot/handlers/2/download_sandbox|Download Sandbox>
-          handling command "test command failed1" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/1/log|Log> <http://localhost:8080/bumpbot/handlers/1/download_sandbox|Download Sandbox>
+          handling command "test command failed5" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/5/handler.log|Log> <http://localhost:8080/bumpbot/handlers/5/sandbox.tgz|Download Sandbox>
+          handling command "test command failed4" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/4/handler.log|Log> <http://localhost:8080/bumpbot/handlers/4/sandbox.tgz|Download Sandbox>
+          handling command "test command failed3" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/3/handler.log|Log> <http://localhost:8080/bumpbot/handlers/3/sandbox.tgz|Download Sandbox>
+          handling command "test command failed2" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/2/handler.log|Log> <http://localhost:8080/bumpbot/handlers/2/sandbox.tgz|Download Sandbox>
+          handling command "test command failed1" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
         EOM
       end
 
@@ -387,7 +387,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
           **ERROR:** failed13
           **ERROR:** failed14
           **ERROR:** failed15
-          handling command "test command failed5" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/5/log|Log> <http://localhost:8080/bumpbot/handlers/5/download_sandbox|Download Sandbox>
+          handling command "test command failed5" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/5/handler.log|Log> <http://localhost:8080/bumpbot/handlers/5/sandbox.tgz|Download Sandbox>
           This is only handlers 11-11 out of 15. To show the next 10, say "handlers 12-22".
         EOM
       end

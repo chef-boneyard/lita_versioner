@@ -17,7 +17,7 @@ module Lita
         running_handlers = self.running_handlers.reject { |handler| handler == self }
         if running_handlers.any?
           running_handlers.sort_by { |handler| [ handler.start_time, handler.handler_id.to_i ] }.reverse_each do |handler|
-            info("#{handler.title} running since #{how_long_ago(handler.start_time)}. <#{config.lita_url}/bumpbot/handlers/#{handler.handler_id}/log|Log> <#{config.lita_url}/bumpbot/handlers/#{handler.handler_id}/download_sandbox|Download Sandbox>")
+            info("#{handler.title} running since #{how_long_ago(handler.start_time)}. <#{config.lita_url}/bumpbot/handlers/#{handler.handler_id}/handler.log|Log> <#{config.lita_url}/bumpbot/handlers/#{handler.handler_id}/sandbox.tgz|Download Sandbox>")
           end
         else
           info("No command or event handlers are running right now.")
@@ -63,7 +63,7 @@ module Lita
             else
               status = "running since #{how_long_ago(start_time)}"
             end
-            info("#{title} #{status}. <#{config.lita_url}/bumpbot/handlers/#{handler_id}/log|Log> <#{config.lita_url}/bumpbot/handlers/#{handler_id}/download_sandbox|Download Sandbox>")
+            info("#{title} #{status}. <#{config.lita_url}/bumpbot/handlers/#{handler_id}/handler.log|Log> <#{config.lita_url}/bumpbot/handlers/#{handler_id}/sandbox.tgz|Download Sandbox>")
           end
           if handlers.size > range.max
             info("This is only handlers #{range.min}-#{range.max} out of #{handlers.size}. To show the next 10, say \"handlers #{range.max + 1}-#{range.max + 11}\".")
