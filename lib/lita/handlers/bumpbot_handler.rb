@@ -2,9 +2,11 @@ require "lita"
 require "forwardable"
 require "tmpdir"
 require "fileutils"
-require_relative "../../lita_versioner"
-require_relative "../../lita_versioner/jenkins_http"
 require "shellwords"
+require "set"
+require_relative "../../lita_versioner"
+require_relative "../../lita_versioner/format_helpers"
+require_relative "../../lita_versioner/jenkins_http"
 
 module Lita
   module Handlers
@@ -12,6 +14,7 @@ module Lita
       # include LitaVersioner so we get the constants from it (so we can use the
       # classes easily here and in subclasses)
       include LitaVersioner
+      include LitaVersioner::FormatHelpers
 
       namespace "versioner"
 
@@ -25,11 +28,15 @@ module Lita
       config :cache_directory, default: "#{Dir.tmpdir}/lita_versioner"
       config :sandbox_directory, default: "#{Dir.tmpdir}/lita_versioner/sandbox"
       config :debug_lines_in_pm, default: true
+      config :lita_url, required: true
+      config :success_log_ttl, default: 60 * 60 * 24 * 7
+      config :failure_log_ttl, default: 60 * 60 * 24 * 60
 
       attr_accessor :project_name
-      attr_reader :handler_name
       attr_reader :response
       attr_accessor :http_response
+      attr_reader :start_time
+      attr_reader :title
 
       #
       # Unique ID for the handler
@@ -41,24 +48,35 @@ module Lita
         klass.namespace("versioner")
       end
 
-      @@handler_mutex = Mutex.new
-      @@handler_id = 0
+      def self.reset!
+        @@running_handlers = Set.new
+      end
+      reset!
+
+      def self.running_handlers
+        @@running_handlers
+      end
+
+      def running_handlers
+        @@running_handlers
+      end
 
       # Give the handler a monotonically increasing ID
       def initialize(*args)
         super
-        @@handler_mutex.synchronize do
-          @@handler_id += 1
-          @handler_id = @@handler_id.to_s
-        end
+        @handler_id = redis.incr("max_handler_id")
       end
 
+      #
+      # Synchronizes log access so we don't get lines on top of each other
+      #
       def project_repo
         @project_repo ||= ProjectRepo.new(self)
       end
 
-      def cleanup
+      def remove_sandbox_directory
         FileUtils.rm_rf(sandbox_directory)
+        debug("Cleaned up sandbox directory #{sandbox_directory} after successful command ...")
       end
 
       #
@@ -73,75 +91,130 @@ module Lita
       #     'EXTRA_ARG_NAME' => 'some usage',
       #     'DIFFERENT_ARG SEQUENCE HERE' => 'different usage'
       #   }
+      # @param project_arg [Boolean] Whether the first arg should be PROJECT or not. Default: true
       # @param max_args [Int] Maximum number of extra arguments that this command takes.
       #
-      def self.command_route(command, help, max_args: 0, &block)
+      def self.command_route(command, help, project_arg: true, max_args: 0, &block)
         help = { "" => help } unless help.is_a?(Hash)
 
         complete_help = {}
         help.each do |arg, text|
-          complete_help["#{command} PROJECT #{arg}".strip] = text
-        end
-        route(/^#{command}(\s|$)/, nil, command: true, help: complete_help) do |response|
-          # This block will be instance-evaled in the context of the handler
-          # instance - so we can set instance variables etc.
-          begin
-            init_command(command, response, complete_help, max_args)
-            instance_exec(*command_args, &block)
-            cleanup
-          rescue ErrorAlreadyReported
-            debug("Sandbox: #{sandbox_directory}")
-          rescue
-            msg = "Unhandled error while working on \"#{response.message.body}\":\n" +
-              "```#{$!}\n#{$!.backtrace.join("\n")}```."
-            error(msg)
-            debug("Sandbox: #{sandbox_directory}")
+          if project_arg
+            complete_help["#{command} PROJECT #{arg}".strip] = text
+          else
+            complete_help["#{command} #{arg}".strip] = text
           end
         end
-      end
-
-      #
-      # Cache directory for this handler instance to
-      #
-      def sandbox_directory
-        @sandbox_directory ||= begin
-          dir = File.join(config.sandbox_directory, handler_id)
-          FileUtils.rm_rf(dir)
-          FileUtils.mkdir_p(dir)
-          dir
+        route(/^#{command}(\s|$)/, nil, command: true, help: complete_help) do |response|
+          handle_command(command, response, help: complete_help, project_arg: project_arg, max_args: max_args, &block)
         end
       end
 
       #
-      # Callback wrapper for non-command handlers.
+      # Cache directory for this handler instance
+      #
+      attr_reader :sandbox_directory
+
+      #
+      # Callback wrapper for handlers.
       #
       # @param title The event title.
       # @return whatever the provided block returns.
       #
-      def handle_event(title)
-        init_event(title)
-        yield
-        cleanup
-      rescue ErrorAlreadyReported
-        debug("Sandbox: #{sandbox_directory}")
+      def handle(title, response: nil, &block)
+        if running_handlers.include?(self)
+          raise "Cannot call handle_event or handle_command twice for a single handler! Already running #{title.inspect}, and asked to run #{self.title.inspect}"
+        end
+
+        @title = title
+        @start_time = Time.now.utc
+        @response = response
+        running_handlers << self
+        redis.hmset("handlers:#{handler_id}",
+                    "title", title,
+                    "start_time", start_time.to_i)
+        # Assume we will fail, and set the log to expire in failure_ttl
+        redis.set("handler_logs:#{handler_id}", "", ex: config.failure_log_ttl)
+
+        create_sandbox_directory
+        debug("Started #{title}")
+
+        # Actually handler the command
+        instance_eval(&block)
+
+        end_time = Time.now.utc
+        debug("Completed #{title} in #{format_duration(end_time - start_time)}")
+        remove_sandbox_directory
+
+        redis.hmset("handlers:#{handler_id}",
+                    "end_time", end_time.to_i)
+        # Set successful logs to expire earlier
+        redis.expire("handler_logs:#{handler_id}", config.success_log_ttl)
+
+      # In case of an error, report it and set result to FAILURE
       rescue
-        msg = "Unhandled error while working on \"#{title}\":\n" +
-          "```#{$!}\n#{$!.backtrace.join("\n")}."
-        debug("Sandbox: #{sandbox_directory}")
-        error(msg)
+        end_time = Time.now.utc
+        begin
+          unless ErrorAlreadyReported === $!
+            msg = "Unhandled error while #{title}:\n" +
+              "```#{$!}\n#{$!.backtrace.join("\n")}```."
+            error(msg)
+          end
+          debug("Completed #{title} in #{format_duration(end_time - start_time)}")
+        ensure
+          # Even if the act of reporting the error raises, we want to set the
+          # command finished (if we can).
+          redis.hmset("handlers:#{handler_id}",
+                      "end_time", end_time.to_i,
+                      "failed", "1")
+        end
+      ensure
+        running_handlers.delete(self)
       end
 
-      def run_command(command, timeout: 3600, **options)
-        Bundler.with_clean_env do
-          options[:timeout] = timeout
+      #
+      # Run a command (and report the output)
+      #
+      def run_command(command, **options)
+        command_start_time = Time.now.utc
+        command = Shellwords.join(command) if command.is_a?(Array)
 
-          command = Shellwords.join(command) if command.is_a?(Array)
-          debug("Running \"#{command}\" with #{options}")
-          shellout = Mixlib::ShellOut.new(command, options)
-          shellout.run_command
+        Bundler.with_clean_env do
+          read_thread_exception = nil
+          begin
+            # Listen for output from the command
+            read, write = IO.pipe
+            read_thread = Thread.new do
+              begin
+                buf = ""
+                # We want to read *up to* 32K, but we want to read as quick as we can.
+                loop do
+                  begin
+                    read.readpartial(32 * 1024, buf)
+                    debug(buf)
+                  rescue EOFError
+                    break
+                  end
+                end
+              rescue
+                read_thread_exception = $!
+              end
+            end
+
+            # Start the command
+            debug("`#{command}` starting#{" with #{options.map { |k, v| "#{k}=#{v}" }.join(", ")}" if options}")
+            shellout = Mixlib::ShellOut.new(command, live_stream: write, timeout: 3600, **options)
+            shellout.run_command
+          ensure
+            # Command is finished one way or the other. Close out the pipe and
+            # wait for it to output.
+            write.close if write
+            read_thread.join if read_thread
+          end
+
+          debug("Completed `#{command}` with status #{shellout.exitstatus} in #{format_duration(Time.now.utc - command_start_time)}")
           shellout.error!
-          debug("STDOUT:\n```#{shellout.stdout}```\n")
-          debug("STDERR:\n```#{shellout.stderr}```\n") if shellout.stderr != ""
+          error!("Read thread exception: #{read_thread_exception}\n#{read_thread_exception.backtrace.map { |l| "  #{l}" }}") if read_thread_exception
           shellout
         end
       end
@@ -228,34 +301,36 @@ module Lita
 
       private
 
-      #
-      # Initialize this handler as a chat command handler.
-      #
-      def init_command(command, response, help, max_args)
-        command_words = command.split(/\s+/)
-        @handler_name = command
-        @response = response
-        # strip extra words from the args, like "update dependencies"
-        args = response.args[command_words.size - 1..-1]
-        error!("No project specified!\n#{usage(help)}") if args.empty?
-        @project_name = args.shift
-        @command_args = args
-        debug("Handling command #{command.inspect}")
-        unless project
-          error!("Invalid project #{project_name}. Valid projects: #{projects.keys.join(", ")}.\n#{usage(help)}")
-        end
-        if command_args.size > max_args
-          error!("Too many arguments (#{command_args.size + 1} for #{max_args + 1})!\n#{usage(help)}")
+      def handle_command(command, response, **arg_options, &block)
+        handle("handling command #{response.message.body.inspect} from #{response.message.source.user.mention_name}#{response.message.source.room ? " in #{response.message.source.room}" : ""}", response: response) do
+          redis.hset("handlers:#{handler_id}", "command", command)
+          parse_args(command, response, **arg_options)
+          redis.hset("handlers:#{handler_id}", "project", project_name) if project_name
+          redis.hset("handlers:#{handler_id}", "command_args", Shellwords.join(command_args))
+          instance_exec(*command_args, &block)
         end
       end
 
-      #
-      # Initialize this handler as a chat command handler.
-      #
-      def init_event(name)
-        @handler_name = name
-        @response = nil
-        debug("Handling event #{name}")
+      def parse_args(command, response, help:, project_arg: true, max_args: 0)
+        # Strip extra words from the args: response.args will start with
+        # "dependencies" if the command is "update dependencies"
+        command_words = command.split(/\s+/)
+        args = response.args[command_words.size - 1..-1]
+
+        if project_arg
+          # Grab the project name and command args
+          @project_name = args.shift
+          error!("No project specified!\n#{usage(help)}") unless project_name
+          unless project
+            error!("Invalid project #{project_name}. Valid projects: #{projects.keys.join(", ")}.\n#{usage(help)}")
+          end
+        end
+
+        @command_args = args
+
+        if command_args.size > max_args
+          error!("Too many arguments (#{command_args.size + (project_arg ? 1 : 0)} for #{max_args + (project_arg ? 1 : 0)})!\n#{usage(help)}")
+        end
       end
 
       #
@@ -268,16 +343,38 @@ module Lita
         usage << usage_lines.join("\n")
       end
 
+      attr_accessor :last_log_time
+      attr_accessor :last_log_level
+
       #
       # Log to the default Lita logger with a custom per-line prefix.
       #
       # This is help identify what command or handler a particular message came
       # from when reading syslog.
       #
-      def log_each_line(log_method, message)
-        prefix = "<#{handler_name}>{#{project_name || "unknown"}} "
+      def log_each_line(log_level, message)
+        time = Time.now.utc.to_s
+
+        log_time = time.to_s
+        justified_log_level = log_level.to_s.upcase.ljust(5)
+        log_chunk = message.to_s.lines.map do |line|
+          # After the first line of the output, emit spaces for easier reading
+          if log_time == last_log_time
+            log_time = " " * log_time.size if log_time == last_log_time
+          else
+            self.last_log_time = log_time
+          end
+          if justified_log_level == last_log_level
+            justified_log_level = " " * justified_log_level.size if justified_log_level == last_log_level
+          else
+            self.last_log_level = justified_log_level
+          end
+          "[#{log_time} #{justified_log_level}] #{line.chomp}\n"
+        end.join("")
+        redis.append("handler_logs:#{handler_id}", log_chunk)
+
         message.to_s.each_line do |l|
-          log.public_send(log_method, "#{prefix}#{l.chomp}")
+          log.public_send(log_level, "[#{handler_id}] #{l.chomp}")
         end
       end
 
@@ -316,8 +413,17 @@ module Lita
         log_each_line(:error, "Unable to resolve ##{channel_name}.") unless source
         source
       end
-    end
 
-    Lita.register_handler(BumpbotHandler)
+      def create_sandbox_directory
+        @sandbox_directory = begin
+          dir = File.join(config.sandbox_directory, handler_id.to_s)
+          FileUtils.rm_rf(dir)
+          FileUtils.mkdir_p(dir)
+          dir
+        end
+      end
+
+      Lita.register_handler(self)
+    end
   end
 end
