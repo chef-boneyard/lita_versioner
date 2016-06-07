@@ -34,13 +34,19 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
     log.gsub(tmpdir, "/TMPDIR")
   end
 
+  # Allow things to take 1 second extra and still match
+  def one_second_slop(log)
+    log = log.gsub("1 second ago", "just now")
+    log.gsub("3 seconds ago", "2 seconds ago")
+  end
+
   with_jenkins_server "http://manhattan.ci.chef.co"
 
   context "bumpbot handlers" do
     it "bumpbot running handlers with arguments emits a reasonable error message" do
       send_command("bumpbot running handlers blarghle")
 
-      expect(reply_string).to eq(strip_eom_block(<<-EOM))
+      expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
         **ERROR:** Too many arguments (1 for 0)!
         Usage: bumpbot running handlers   - Get the list of running handlers in bumpbot
       EOM
@@ -49,7 +55,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
     it "bumpbot handlers with more than one argument emits a reasonable error message" do
       send_command("bumpbot handlers 1-2 blarghle")
 
-      expect(reply_string).to eq(strip_eom_block(<<-EOM))
+      expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
         **ERROR:** Too many arguments (2 for 1)!
         Usage: bumpbot handlers [RANGE]   - Get the list of running and failed handlers in bumpbot (corresponds to the list of failed commands). Optional RANGE will get you a list of handlers. Default range is 1-10.
       EOM
@@ -59,7 +65,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
       it "bumpbot running handlers reports no handlers" do
         send_command("bumpbot running handlers")
 
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
+        expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
           No command or event handlers are running right now.
         EOM
       end
@@ -67,7 +73,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
       it "bumpbot handlers reports no handlers" do
         send_command("bumpbot handlers")
 
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
+        expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
           The system is not running any handlers, and nothing has failed, so there is no handler history to show.
         EOM
       end
@@ -92,7 +98,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         handler.stop
         handler_thread.join
 
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
+        expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
           handling command "test wait" from Test User running since just now. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
         EOM
       end
@@ -103,7 +109,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         handler.stop
         handler_thread.join
 
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
+        expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
           handling command "test wait" from Test User running since 2 seconds ago. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
         EOM
       end
@@ -114,7 +120,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         handler.stop
         handler_thread.join
 
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
+        expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
           handling command "test wait" from Test User running since just now. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
         EOM
       end
@@ -125,7 +131,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         handler.stop
         handler_thread.join
 
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
+        expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
           handling command "test wait" from Test User running since 2 seconds ago. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
         EOM
       end
@@ -157,7 +163,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
       it "bumpbot running handlers does not show it" do
         send_command("bumpbot running handlers")
 
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
+        expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
           No command or event handlers are running right now.
         EOM
       end
@@ -165,7 +171,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
       it "bumpbot handlers shows it" do
         send_command("bumpbot handlers")
 
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
+        expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
           handling command "test command" from Test User succeeded just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
         EOM
       end
@@ -189,7 +195,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
       it "bumpbot running handlers does not show it" do
         send_command("bumpbot running handlers")
 
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
+        expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
           **ERROR:** failed_miserably
           No command or event handlers are running right now.
         EOM
@@ -198,7 +204,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
       it "bumpbot handlers shows it" do
         send_command("bumpbot handlers")
 
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
+        expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
           **ERROR:** failed_miserably
           handling command "test command failed_miserably" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
         EOM
@@ -209,7 +215,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         send_command("test command failed_just_now")
         send_command("bumpbot handlers")
 
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
+        expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
           **ERROR:** failed_miserably
           **ERROR:** failed_just_now
           handling command "test command failed_just_now" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/2/handler.log|Log> <http://localhost:8080/bumpbot/handlers/2/sandbox.tgz|Download Sandbox>
@@ -238,7 +244,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
       it "bumpbot handlers shows 1-10 by default" do
         send_command("bumpbot handlers")
 
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
+        expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
           **ERROR:** failed1
           **ERROR:** failed2
           **ERROR:** failed3
@@ -271,7 +277,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
       it "bumpbot handlers 1-15 shows all of them" do
         send_command("bumpbot handlers 1-15")
 
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
+        expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
           **ERROR:** failed1
           **ERROR:** failed2
           **ERROR:** failed3
@@ -308,7 +314,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
       it "bumpbot handlers 2- shows all but the first" do
         send_command("bumpbot handlers 2-")
 
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
+        expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
           **ERROR:** failed1
           **ERROR:** failed2
           **ERROR:** failed3
@@ -344,7 +350,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
       it "bumpbot handlers 11-15 shows the last 5" do
         send_command("bumpbot handlers 11-15")
 
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
+        expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
           **ERROR:** failed1
           **ERROR:** failed2
           **ERROR:** failed3
@@ -371,7 +377,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
       it "bumpbot handlers 11 shows the 11th" do
         send_command("bumpbot handlers 11")
 
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
+        expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
           **ERROR:** failed1
           **ERROR:** failed2
           **ERROR:** failed3
