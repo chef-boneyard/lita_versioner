@@ -42,7 +42,6 @@ module Lita
         bump_version_and_trigger_build
       end
 
-
       #
       # Helpers (private)
       #

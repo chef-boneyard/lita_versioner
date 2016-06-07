@@ -68,7 +68,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
     context "when a handler is running" do
       before do
         @handler_thread = Thread.new { send_command("test wait") }
-        while true
+        loop do
           @handler = Lita::Handlers::BumpbotHandler.running_handlers.find { |handler| handler.is_a?(Lita::Handlers::TestWaitHandler) }
           break if @handler
           sleep(0.05)

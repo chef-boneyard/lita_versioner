@@ -56,9 +56,11 @@ module Lita
       def handler_mutex
         @@handler_mutex
       end
+
       def self.running_handlers
         @@running_handlers
       end
+
       def running_handlers
         @@running_handlers
       end
@@ -180,9 +182,9 @@ module Lita
               begin
                 buf = ""
                 # We want to read *up to* 32K, but we want to read as quick as we can.
-                while true
+                loop do
                   begin
-                    read.readpartial(32*1024, buf)
+                    read.readpartial(32 * 1024, buf)
                     debug(buf)
                   rescue EOFError
                     break
@@ -194,7 +196,7 @@ module Lita
             end
 
             # Start the command
-            debug("`#{command}` starting#{" with #{options.map {|k,v| "#{k}=#{v}"}.join(", ")}" if options}")
+            debug("`#{command}` starting#{" with #{options.map { |k, v| "#{k}=#{v}" }.join(", ")}" if options}")
             shellout = Mixlib::ShellOut.new(command, live_stream: write, timeout: 3600, **options)
             shellout.run_command
           ensure
@@ -206,7 +208,7 @@ module Lita
 
           debug("Completed `#{command}` with status #{shellout.exitstatus} in #{format_duration(Time.now.utc - command_start_time)}")
           shellout.error!
-          error!("Read thread exception: #{read_thread_exception}\n#{read_thread_exception.backtrace.map { |l| "  #{l}"}}") if read_thread_exception
+          error!("Read thread exception: #{read_thread_exception}\n#{read_thread_exception.backtrace.map { |l| "  #{l}" }}") if read_thread_exception
           shellout
         end
       end

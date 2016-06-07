@@ -32,7 +32,7 @@ module Lita
         { "[RANGE]" => "Get the list of running and failed handlers in bumpbot (corresponds to the list of failed commands). Optional RANGE will get you a list of sandboxes. Default range is 1-10." },
         project_arg: false,
         max_args: 1
-      ) do |range="1-10"|
+      ) do |range = "1-10"|
         raise "Range must be <start index>-<end index>!" unless range =~ /^(\d+)(-)?(\d*)$/
         raise "Range start cannot be 0 (starts at 1!)" if $1 == "0"
 
@@ -51,7 +51,7 @@ module Lita
 
         if sandboxes.any?
           sandboxes.each_with_index do |(handler_id, handler, title, end_time), index|
-            next unless range.include?(index+1)
+            next unless range.include?(index + 1)
             if handler
               status = "started #{how_long_ago(handler.start_time)}"
             else
@@ -60,7 +60,7 @@ module Lita
             info("#{title} #{status}. <#{config.lita_url}/bumpbot/handlers/#{handler_id}/log|Log> <#{config.lita_url}/bumpbot/handlers/#{handler_id}/download_sandbox|Download Sandbox>")
           end
           if sandboxes.size > range.max
-            info("This is only handlers #{range.min}-#{range.max} out of #{sandboxes.size}. To show the next 10, say \"handlers #{range.max+1}-#{range.max+11}\".")
+            info("This is only handlers #{range.min}-#{range.max} out of #{sandboxes.size}. To show the next 10, say \"handlers #{range.max + 1}-#{range.max + 11}\".")
           end
         else
           info("The system is not running any handlers, and nothing has failed, so there is no handler history to show.")
@@ -103,7 +103,7 @@ module Lita
 
         # Add stuff which doesn't have a sandbox yet
         running_handlers.each do |running_handler|
-          unless sandboxes.any? { |id,handler,title,end_time| handler == running_handler }
+          unless sandboxes.any? { |id, handler, title, end_time| handler == running_handler }
             sandboxes << [ running_handler.handler_id.to_i, running_handler, running_handler.title, Time.now.utc ]
           end
         end
