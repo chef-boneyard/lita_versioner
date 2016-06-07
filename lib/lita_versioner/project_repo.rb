@@ -141,7 +141,7 @@ module LitaVersioner
       #   git@github.com:chef-cookbooks/languages.git
       #   /tmp/lita-test
       repo = File.basename(github_url)
-      repo = repo[0..-4] if repo.end_with?(".git")
+      repo = repo[0..-5] if repo.end_with?(".git")
       repo
     end
 
@@ -172,10 +172,13 @@ module LitaVersioner
     end
 
     @@main_repo_mutex = Mutex.new
+    def main_repo_mutex
+      @@main_repo_mutex
+    end
 
     # Create or refresh ./cache/chef-dk.git
     def refresh_main_repository
-      @@main_repo_mutex.synchronize do
+      main_repo_mutex.synchronize do
         # Clone the main repository if it doesn't exist
         unless Dir.exists?(main_repo_directory)
           FileUtils.mkdir_p(File.dirname(main_repo_directory))
