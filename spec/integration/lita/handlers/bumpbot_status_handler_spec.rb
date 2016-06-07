@@ -162,7 +162,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         EOM
       end
 
-      it "bumpbot running handlers does not show it" do
+      it "bumpbot handlers shows it" do
         send_command("bumpbot handlers")
 
         expect(reply_string).to eq(strip_eom_block(<<-EOM))
