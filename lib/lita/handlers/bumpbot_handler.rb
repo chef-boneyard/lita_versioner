@@ -356,7 +356,7 @@ module Lita
               else
                 self.last_log_time = log_time
               end
-              if log_level == justified_log_level
+              if justified_log_level == last_log_level
                 justified_log_level = " " * justified_log_level.size if justified_log_level == last_log_level
               else
                 self.last_log_level = justified_log_level

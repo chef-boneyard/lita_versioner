@@ -2,7 +2,7 @@ require "spec_helper"
 require "tmpdir"
 require "fileutils"
 
-describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_lita_handlers: [ Lita::Handlers::BumpbotHandler, Lita::Handlers::TestWaitHandler, Lita::Handlers::TestCommandHandler ] do
+describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_lita_handlers: [ Lita::Handlers::BumpbotStatusWebpageHandler, Lita::Handlers::BumpbotHandler, Lita::Handlers::TestWaitHandler, Lita::Handlers::TestCommandHandler ] do
   # Initialize lita
   before do
     Lita.config.handlers.versioner.projects = {
@@ -24,6 +24,12 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
   before do
     create_remote_git_repo(git_remote, "a.txt" => "A")
     @initial_commit_sha = git_sha(git_remote)
+  end
+
+  TIMESTAMP_SIZE = "2016-06-07 02:45:52 UTC ".size
+  def strip_log_data(log)
+    log = log.gsub(/^\[.{#{TIMESTAMP_SIZE}}/, "[")
+    log.gsub(tmpdir, "/TMPDIR")
   end
 
   with_jenkins_server "http://manhattan.ci.chef.co"
@@ -121,6 +127,24 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
           handling command "test wait" from Test User started 2 seconds ago. <http://localhost:8080/bumpbot/handlers/1/log|Log> <http://localhost:8080/bumpbot/handlers/1/download_sandbox|Download Sandbox>
         EOM
       end
+
+      it "GET /bumpbot/handlers/1/sandbox/handler.log streams the response" do
+        response = nil
+        get_thread = Thread.new { response = http.get("/bumpbot/handlers/1/sandbox/handler.log") }
+
+        # Wait long enough that the response would close if it exited early
+        sleep(0.2)
+        handler.stop
+        handler_thread.join
+        get_thread.join
+
+        expect(response.status).to eq(200)
+        expect(strip_log_data(response.body)).to eq(strip_eom_block(<<-EOM))
+          [DEBUG] Starting handling command "test wait" from Test User
+          [     ] Completed handling command "test wait" from Test User in 00:00:00
+          [     ] Cleaning up sandbox directory /TMPDIR/cache/sandbox/1 after successful command ...
+        EOM
+      end
     end
 
     context "when a handler has already completed successfully" do
@@ -142,6 +166,11 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         expect(reply_string).to eq(strip_eom_block(<<-EOM))
           The system is not running any handlers, and nothing has failed, so there is no handler history to show.
         EOM
+      end
+
+      it "GET /bumpbot/handlers/1/sandbox/handler.log returns 404" do
+        response = http.get("/bumpbot/handlers/1/sandbox/handler.log")
+        expect(response.status).to eq(404)
       end
     end
 
@@ -178,6 +207,16 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
           **ERROR:** failed_just_now
           handling command "test command failed_just_now" from Test User failed just now. <http://localhost:8080/bumpbot/handlers/2/log|Log> <http://localhost:8080/bumpbot/handlers/2/download_sandbox|Download Sandbox>
           handling command "test command failed_miserably" from Test User failed 2 seconds ago. <http://localhost:8080/bumpbot/handlers/1/log|Log> <http://localhost:8080/bumpbot/handlers/1/download_sandbox|Download Sandbox>
+        EOM
+      end
+
+      it "GET /bumpbot/handlers/1/sandbox/handler.log shows it" do
+        response = http.get("/bumpbot/handlers/1/sandbox/handler.log")
+        expect(response.status).to eq(200)
+        expect(strip_log_data(response.body)).to eq(strip_eom_block(<<-EOM))
+          [DEBUG] Starting handling command "test command failed_miserably" from Test User
+          [ERROR] failed_miserably
+          [DEBUG] Completed handling command "test command failed_miserably" from Test User in 00:00:00
         EOM
       end
     end
