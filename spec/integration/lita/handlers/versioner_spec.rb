@@ -3,6 +3,8 @@ require "tmpdir"
 require "fileutils"
 
 describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers: Lita::Handlers::BumpbotHandler do
+  include LitaHelpers
+
   # Initialize lita
   before do
     Lita.config.handlers.versioner.projects = {

@@ -7,22 +7,22 @@ module Lita
       include LitaVersioner::FormatHelpers
 
       #
-      # Webpage: /bumpbot/handlers/:id/sandbox/handler.log
+      # Webpage: /bumpbot/handlers/:id/handler.log
       #
-      http.get "/bumpbot/handlers/:id/sandbox/handler.log" do |request, response|
+      http.get "/bumpbot/handlers/:id/handler.log" do |request, response|
         self.http_response = response
         handler_id = request.env["router.params"][:id]
-        handle "Webpage /bumpbot/handlers/#{handler_id}/sandbox/handler.log" do
+        handle "Webpage /bumpbot/handlers/#{handler_id}/handler.log" do
           handler_log = File.join(config.sandbox_directory, handler_id.to_s, "handler.log")
           handler = running_handlers.find { |handler| handler.handler_id.to_i == handler_id.to_i }
           begin
-            File.open(handler_log, "rb") do |file|
-              response.headers["Content-Type"] = "text/plain"
-              loop do
-                response.write(file.read)
-                break unless handler && running_handlers.include?(handler)
-                sleep(0.1)
-              end
+            index = 0
+            loop do
+              buf = redis.getrange("handler_logs:#{handler_id}", index, -1)
+              response.write(buf)
+              index += buf.size
+              break unless handler && running_handlers.include?(handler)
+              sleep(0.1)
             end
           rescue Errno::ENOENT
             error!("#{handler_log} not found", status: "404")

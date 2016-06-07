@@ -29,6 +29,8 @@ module Lita
       config :sandbox_directory, default: "#{Dir.tmpdir}/lita_versioner/sandbox"
       config :debug_lines_in_pm, default: true
       config :lita_url, required: true
+      config :success_log_ttl, default: 60 * 60 * 24 * 7
+      config :failure_log_ttl, default: 60 * 60 * 24 * 60
 
       attr_accessor :project_name
       attr_reader :response
@@ -47,15 +49,9 @@ module Lita
       end
 
       def self.reset!
-        @@handler_id = 0
-        @@handler_mutex = Mutex.new
         @@running_handlers = Set.new
       end
       reset!
-
-      def handler_mutex
-        @@handler_mutex
-      end
 
       def self.running_handlers
         @@running_handlers
@@ -68,25 +64,19 @@ module Lita
       # Give the handler a monotonically increasing ID
       def initialize(*args)
         super
-        @log_mutex = Mutex.new
-        handler_mutex.synchronize do
-          @@handler_id += 1
-          @handler_id = @@handler_id.to_s
-        end
+        @handler_id = redis.incr("max_handler_id")
       end
 
       #
       # Synchronizes log access so we don't get lines on top of each other
       #
-      attr_reader :log_mutex
-
       def project_repo
         @project_repo ||= ProjectRepo.new(self)
       end
 
       def remove_sandbox_directory
-        debug("Cleaning up sandbox directory #{sandbox_directory} after successful command ...")
         FileUtils.rm_rf(sandbox_directory)
+        debug("Cleaned up sandbox directory #{sandbox_directory} after successful command ...")
       end
 
       #
@@ -126,42 +116,58 @@ module Lita
       attr_reader :sandbox_directory
 
       #
-      # The log file we write messages to for this handler
-      #
-      def logfile
-        File.join(sandbox_directory, "handler.log")
-      end
-
-      def title_filename
-        File.join(sandbox_directory, "title.txt")
-      end
-
-      #
       # Callback wrapper for handlers.
       #
       # @param title The event title.
       # @return whatever the provided block returns.
       #
       def handle(title, response: nil, &block)
-        raise "Cannot call handle_event or handle_command twice for a single handler! Already running #{title.inspect}, and asked to run #{self.title.inspect}" if running_handlers.include?(self)
+        if running_handlers.include?(self)
+          raise "Cannot call handle_event or handle_command twice for a single handler! Already running #{title.inspect}, and asked to run #{self.title.inspect}"
+        end
 
         @title = title
         @start_time = Time.now.utc
         @response = response
         running_handlers << self
+        redis.hmset("handlers:#{handler_id}",
+                    "title", title,
+                    "start_time", start_time.to_i)
+        # Assume we will fail, and set the log to expire in failure_ttl
+        redis.set("handler_logs:#{handler_id}", "", ex: config.failure_log_ttl)
+
         create_sandbox_directory
-        debug("Starting #{title}")
-        IO.write(title_filename, title)
+        debug("Started #{title}")
+
+        # Actually handler the command
         instance_eval(&block)
-        debug("Completed #{title} in #{format_duration(Time.now.utc - start_time)}")
+
+        end_time = Time.now.utc
+        debug("Completed #{title} in #{format_duration(end_time - start_time)}")
         remove_sandbox_directory
-      rescue ErrorAlreadyReported
-        debug("Completed #{title} in #{format_duration(Time.now.utc - start_time)}")
+
+        redis.hmset("handlers:#{handler_id}",
+                    "end_time", end_time.to_i)
+        # Set successful logs to expire earlier
+        redis.expire("handler_logs:#{handler_id}", config.success_log_ttl)
+
+      # In case of an error, report it and set result to FAILURE
       rescue
-        msg = "Unhandled error while #{title}:\n" +
-          "```#{$!}\n#{$!.backtrace.join("\n")}```."
-        error(msg)
-        debug("Completed #{title} in #{format_duration(Time.now.utc - start_time)}")
+        end_time = Time.now.utc
+        begin
+          unless ErrorAlreadyReported === $!
+            msg = "Unhandled error while #{title}:\n" +
+              "```#{$!}\n#{$!.backtrace.join("\n")}```."
+            error(msg)
+          end
+          debug("Completed #{title} in #{format_duration(end_time - start_time)}")
+        ensure
+          # Even if the act of reporting the error raises, we want to set the
+          # command finished (if we can).
+          redis.hmset("handlers:#{handler_id}",
+                      "end_time", end_time.to_i,
+                      "failed", "1")
+        end
       ensure
         running_handlers.delete(self)
       end
@@ -297,7 +303,10 @@ module Lita
 
       def handle_command(command, response, **arg_options, &block)
         handle("handling command #{response.message.body.inspect} from #{response.message.source.user.mention_name}#{response.message.source.room ? " in #{response.message.source.room}" : ""}", response: response) do
+          redis.hset("handlers:#{handler_id}", "command", command)
           parse_args(command, response, **arg_options)
+          redis.hset("handlers:#{handler_id}", "project", project_name) if project_name
+          redis.hset("handlers:#{handler_id}", "command_args", Shellwords.join(command_args))
           instance_exec(*command_args, &block)
         end
       end
@@ -345,26 +354,25 @@ module Lita
       #
       def log_each_line(log_level, message)
         time = Time.now.utc.to_s
-        log_mutex.synchronize do
-          File.open(logfile, "a") do |file|
-            log_time = time.to_s
-            justified_log_level = log_level.to_s.upcase.ljust(5)
-            message.to_s.each_line do |line|
-              # After the first line of the output, emit spaces for easier reading
-              if log_time == last_log_time
-                log_time = " " * log_time.size if log_time == last_log_time
-              else
-                self.last_log_time = log_time
-              end
-              if justified_log_level == last_log_level
-                justified_log_level = " " * justified_log_level.size if justified_log_level == last_log_level
-              else
-                self.last_log_level = justified_log_level
-              end
-              file.puts("[#{log_time} #{justified_log_level}] #{line.chomp}")
-            end
+
+        log_time = time.to_s
+        justified_log_level = log_level.to_s.upcase.ljust(5)
+        log_chunk = message.to_s.lines.map do |line|
+          # After the first line of the output, emit spaces for easier reading
+          if log_time == last_log_time
+            log_time = " " * log_time.size if log_time == last_log_time
+          else
+            self.last_log_time = log_time
           end
-        end
+          if justified_log_level == last_log_level
+            justified_log_level = " " * justified_log_level.size if justified_log_level == last_log_level
+          else
+            self.last_log_level = justified_log_level
+          end
+          "[#{log_time} #{justified_log_level}] #{line.chomp}\n"
+        end.join("")
+        redis.append("handler_logs:#{handler_id}", log_chunk)
+
         message.to_s.each_line do |l|
           log.public_send(log_level, "[#{handler_id}] #{l.chomp}")
         end
@@ -408,7 +416,7 @@ module Lita
 
       def create_sandbox_directory
         @sandbox_directory = begin
-          dir = File.join(config.sandbox_directory, handler_id)
+          dir = File.join(config.sandbox_directory, handler_id.to_s)
           FileUtils.rm_rf(dir)
           FileUtils.mkdir_p(dir)
           dir

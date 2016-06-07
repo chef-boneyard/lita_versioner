@@ -17,7 +17,7 @@ module Lita
         running_handlers = self.running_handlers.reject { |handler| handler == self }
         if running_handlers.any?
           running_handlers.sort_by { |handler| [ handler.start_time, handler.handler_id.to_i ] }.reverse_each do |handler|
-            info("#{handler.title} started #{how_long_ago(handler.start_time)}. <#{config.lita_url}/bumpbot/handlers/#{handler.handler_id}/log|Log> <#{config.lita_url}/bumpbot/handlers/#{handler.handler_id}/download_sandbox|Download Sandbox>")
+            info("#{handler.title} running since #{how_long_ago(handler.start_time)}. <#{config.lita_url}/bumpbot/handlers/#{handler.handler_id}/log|Log> <#{config.lita_url}/bumpbot/handlers/#{handler.handler_id}/download_sandbox|Download Sandbox>")
           end
         else
           info("No command or event handlers are running right now.")
@@ -25,42 +25,48 @@ module Lita
       end
 
       #
-      # Command: bumpbot sandboxes
+      # Command: bumpbot handlers
       #
       command_route(
         "bumpbot handlers",
-        { "[RANGE]" => "Get the list of running and failed handlers in bumpbot (corresponds to the list of failed commands). Optional RANGE will get you a list of sandboxes. Default range is 1-10." },
+        { "[RANGE]" => "Get the list of running and failed handlers in bumpbot (corresponds to the list of failed commands). Optional RANGE will get you a list of handlers. Default range is 1-10." },
         project_arg: false,
         max_args: 1
       ) do |range = "1-10"|
         raise "Range must be <start index>-<end index>!" unless range =~ /^(\d+)(-)?(\d*)$/
         raise "Range start cannot be 0 (starts at 1!)" if $1 == "0"
 
-        sandboxes = read_sandboxes
-        sandboxes.reject! { |handler_id, handler, title, end_time| handler == self }
+        handlers = list_handlers
+        handlers.reject! { |handler_id, handler, title, start_time, end_time, failed| handler == self }
 
         if $2 == "-"
           if $3 == ""
-            range = $1.to_i..sandboxes.size
+            range = $1.to_i..handlers.size
           else
             range = $1.to_i..$3.to_i
           end
         else
           range = $1.to_i..$1.to_i
         end
+        range = Range.new(range.min, handlers.size) if range.max > handlers.size
+        range = Range.new(handlers.size, range.max) if range.min && range.min > handlers.size
 
-        if sandboxes.any?
-          sandboxes.each_with_index do |(handler_id, handler, title, end_time), index|
+        if handlers.any?
+          handlers.each_with_index do |(handler_id, handler, title, start_time, end_time, failed), index|
             next unless range.include?(index + 1)
-            if handler
-              status = "started #{how_long_ago(handler.start_time)}"
+            if end_time
+              if failed
+                status = "failed #{how_long_ago(start_time)} after #{format_duration(end_time - start_time)}"
+              else
+                status = "succeeded #{how_long_ago(start_time)} after #{format_duration(end_time - start_time)}"
+              end
             else
-              status = "failed #{how_long_ago(end_time)}"
+              status = "running since #{how_long_ago(handler.start_time)}"
             end
             info("#{title} #{status}. <#{config.lita_url}/bumpbot/handlers/#{handler_id}/log|Log> <#{config.lita_url}/bumpbot/handlers/#{handler_id}/download_sandbox|Download Sandbox>")
           end
-          if sandboxes.size > range.max
-            info("This is only handlers #{range.min}-#{range.max} out of #{sandboxes.size}. To show the next 10, say \"handlers #{range.max + 1}-#{range.max + 11}\".")
+          if handlers.size > range.max
+            info("This is only handlers #{range.min}-#{range.max} out of #{handlers.size}. To show the next 10, say \"handlers #{range.max + 1}-#{range.max + 11}\".")
           end
         else
           info("The system is not running any handlers, and nothing has failed, so there is no handler history to show.")
@@ -71,48 +77,24 @@ module Lita
       # Helpers (private)
       #
 
-      def read_sandboxes
-        if File.directory?(config.sandbox_directory)
-          # Get all sandbox directories
-          sandboxes = Dir.entries(config.sandbox_directory).select do |entry|
-            File.directory?(File.join(config.sandbox_directory, entry)) && entry =~ /^\d+$/
-          end
-        else
-          sandboxes = []
-        end
-
-        # Get handler, title and end time
-        sandboxes.map! do |handler_id|
-          handler = running_handlers.find { |handler| handler.handler_id == handler_id }
-          if handler
-            title = handler.title
-            end_time = Time.now.utc
-          else
-            # This is not currently running. Get status from disk
-            # end time is mtime of the logfile
-            title_filename = File.join(config.sandbox_directory, handler_id, "title.txt")
-            begin
-              end_time = File.mtime(title_filename).utc
-              title = IO.read(title_filename).chomp
-            rescue Errno::ENOENT
-              next
-            end
-          end
-          [ handler_id, handler, title, end_time ]
-        end
-
-        # Add stuff which doesn't have a sandbox yet
-        running_handlers.each do |running_handler|
-          unless sandboxes.any? { |id, handler, title, end_time| handler == running_handler }
-            sandboxes << [ running_handler.handler_id.to_i, running_handler, running_handler.title, Time.now.utc ]
-          end
+      def list_handlers
+        handlers = {}
+        redis.scan_each(match: "handlers:*") do |key|
+          handler_id = key.split(":", 2)[1]
+          title, start_time, end_time, failed = redis.hmget("handlers:#{handler_id}", "title", "start_time", "end_time", "failed")
+          next unless title
+          start_time = Time.at(start_time.to_i).utc if start_time
+          end_time = Time.at(end_time.to_i).utc if end_time
+          handler = running_handlers.find { |h| h.handler_id.to_i == handler_id.to_i }
+          handlers[handler_id] = [ handler, title, start_time, end_time, failed ]
         end
 
         # Sort in reverse
-        sandboxes.sort_by! { |handler_id, handler, title, end_time| [ end_time, handler_id.to_i ] }
-        sandboxes.reverse!
+        handlers = handlers.map { |handler_id, data| [ handler_id, *data ] }
+        handlers.sort_by! { |handler_id, *data| handler_id.to_i }
+        handlers.reverse!
 
-        sandboxes
+        handlers
       end
 
       Lita.register_handler(self)

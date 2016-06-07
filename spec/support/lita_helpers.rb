@@ -21,6 +21,17 @@ module LitaHelpers
         lita_config.default_inform_channel = "default_notifications"
         lita_config.polling_interval = nil
       end
+
+      before do
+        Lita::Handlers::BumpbotHandler.running_handlers.each do |handler|
+          handler.stop if handler.is_a?(Lita::Handlers::TestWaitHandler)
+        end
+        Lita::Handlers::BumpbotHandler.reset!
+        handler = Lita::Handlers::BumpbotHandler.new(robot)
+        handler.redis.keys.each do |key|
+          handler.redis.del(key)
+        end
+      end
     end
   end
 

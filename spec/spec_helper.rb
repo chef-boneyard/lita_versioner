@@ -14,12 +14,5 @@ RSpec.configure do |config|
   config.run_all_when_everything_filtered = true
   config.include GitHelpers
   config.include JenkinsHelpers
-  config.include LitaHelpers
   config.include SpecHelpers
-  config.before do
-    Lita::Handlers::BumpbotHandler.running_handlers.each do |handler|
-      handler.stop if handler.is_a?(Lita::Handlers::TestWaitHandler)
-    end
-    Lita::Handlers::BumpbotHandler.reset!
-  end
 end
