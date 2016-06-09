@@ -29,7 +29,7 @@ module Lita
         end
         error!("No pipeline specified in project.") unless pipeline
         success = trigger_build(pipeline, git_ref)
-        info("Kicked off a build for '#{pipeline}' at ref '#{git_ref}'.") if success
+        output.inform("Kicked off a build for '#{pipeline}' at ref '#{git_ref}'.") if success
       end
 
       #
@@ -99,11 +99,10 @@ module Lita
           info("'#{pull_request_url}' was just merged. Bumping version and submitting a build ...")
 
           # Bump the build in a new handler so we get a good title
-          parent = self
           versioner = Versioner.new(robot)
+          versioner.http_response = response
+          versioner.project_name = project_name
           versioner.handle "github merged pull request #{pull_request_url} for #{project_name}: #{merge_commit_sha}" do
-            self.http_response = response
-            self.project_name = parent.project_name
             bump_version_and_trigger_build
           end
         end
@@ -111,10 +110,10 @@ module Lita
 
       def bump_version_and_trigger_build
         new_version = bump_version_in_git
-        info("Bumped version to #{new_version}")
+        output.inform("Bumped version to #{new_version}")
         git_ref = "v#{new_version}"
         success = trigger_build(project[:pipeline], git_ref)
-        info("Kicked off release build for '#{project[:pipeline]}' at ref '#{git_ref}'.") if success
+        output.inform("Kicked off release build for '#{project[:pipeline]}' at ref '#{git_ref}'.") if success
       end
 
       def bump_version_in_git

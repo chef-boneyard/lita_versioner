@@ -6,6 +6,7 @@ require "shellwords"
 require "set"
 require_relative "../../lita_versioner"
 require_relative "../../lita_versioner/format_helpers"
+require_relative "../../lita_versioner/handler_output"
 require_relative "../../lita_versioner/jenkins_http"
 
 module Lita
@@ -32,9 +33,8 @@ module Lita
       config :success_log_ttl, default: 60 * 60 * 24 * 7
       config :failure_log_ttl, default: 60 * 60 * 24 * 60
 
+      attr_reader :output
       attr_accessor :project_name
-      attr_reader :response
-      attr_accessor :http_response
       attr_reader :start_time
       attr_reader :title
 
@@ -43,28 +43,42 @@ module Lita
       #
       attr_reader :handler_id
 
-      def self.inherited(klass)
-        super
-        klass.namespace("versioner")
-      end
-
-      def self.reset!
-        @@running_handlers = Set.new
-      end
-      reset!
-
-      def self.running_handlers
-        @@running_handlers
-      end
-
-      def running_handlers
-        @@running_handlers
-      end
+      #
+      # Optional command arguments if this handler is a command handler.
+      #
+      attr_reader :command_args
 
       # Give the handler a monotonically increasing ID
       def initialize(*args)
         super
         @handler_id = redis.incr("max_handler_id")
+        @output = LitaVersioner::HandlerOutput.new(self)
+      end
+
+      def self.inherited(klass)
+        super
+        klass.namespace("versioner")
+      end
+
+      extend Forwardable
+
+      # User outputs (Slack)
+      def_delegators :output, :respond, :inform, :inform_error, :error!
+      # Log outputs
+      def_delegators :output, :error, :warn, :info, :debug
+
+      #
+      # The Project config for the current project
+      #
+      def project
+        projects[project_name]
+      end
+
+      #
+      # The full list of configured projects
+      #
+      def projects
+        config.projects
       end
 
       #
@@ -121,14 +135,13 @@ module Lita
       # @param title The event title.
       # @return whatever the provided block returns.
       #
-      def handle(title, response: nil, &block)
+      def handle(title, &block)
         if running_handlers.include?(self)
-          raise "Cannot call handle_event or handle_command twice for a single handler! Already running #{title.inspect}, and asked to run #{self.title.inspect}"
+          raise "Cannot call handle or handle_command twice for a single handler! Already running #{self.title.inspect}, but asked to run #{title.inspect}"
         end
 
         @title = title
         @start_time = Time.now.utc
-        @response = response
         running_handlers << self
         redis.hmset("handlers:#{handler_id}",
                     "title", title,
@@ -156,9 +169,15 @@ module Lita
         end_time = Time.now.utc
         begin
           unless ErrorAlreadyReported === $!
-            msg = "Unhandled error while #{title}:\n" +
-              "```#{$!}\n#{$!.backtrace.join("\n")}```."
-            error(msg)
+            msg =  +
+
+            inform_error(attachments: [
+              {
+                color: "danger",
+                pretext: "Unhandled error `#{$!}` while #{title}",
+                text: "```#{$!.backtrace.join("\n")}```."
+              }
+            ])
           end
           debug("Completed #{title} in #{format_duration(end_time - start_time)}")
         ensure
@@ -248,61 +267,27 @@ module Lita
         return true
       end
 
-      #
-      # Optional command arguments if this handler is a command handler.
-      #
-      attr_reader :command_args
+      def self.reset!
+        @@running_handlers = Set.new
+      end
+      reset!
 
-      def error!(message, status: "500")
-        error(message, status: status)
-        raise ErrorAlreadyReported.new(message)
+      def self.running_handlers
+        @@running_handlers
       end
 
-      def error(message, status: "500")
-        if http_response
-          http_response.status = status
-        end
-        send_message("**ERROR:** #{message}")
-        log_each_line(:error, message)
-      end
-
-      def warn(message)
-        send_message("WARN: #{message}")
-        log_each_line(:warn, message)
-      end
-
-      def info(message)
-        send_message(message)
-        log_each_line(:info, message)
-      end
-
-      # debug messages are only sent to users in private messages
-      def debug(message)
-        send_message(message) if response && response.private_message? && config.debug_lines_in_pm
-        log_each_line(:debug, message)
-      end
-
-      def project
-        projects[project_name]
-      end
-
-      def projects
-        config.projects
-      end
-
-      class ErrorAlreadyReported < StandardError
-        attr_accessor :cause
-
-        def initialize(message = nil, cause = nil)
-          super(message)
-          self.cause = cause
-        end
+      def running_handlers
+        @@running_handlers
       end
 
       private
 
       def handle_command(command, response, **arg_options, &block)
-        handle("handling command #{response.message.body.inspect} from #{response.message.source.user.mention_name}#{response.message.source.room ? " in #{response.message.source.room}" : ""}", response: response) do
+        @response = response
+        output.lita_target = lita_target(response)
+        title = "Slack command #{response.message.body.inspect} from @#{response.message.source.user.mention_name}"
+        title << " in ##{response.message.source.room}" unless response.private_message?
+        handle(title) do
           redis.hset("handlers:#{handler_id}", "command", command)
           parse_args(command, response, **arg_options)
           redis.hset("handlers:#{handler_id}", "project", project_name) if project_name
@@ -343,61 +328,8 @@ module Lita
         usage << usage_lines.join("\n")
       end
 
-      attr_accessor :last_log_time
-      attr_accessor :last_log_level
-
-      #
-      # Log to the default Lita logger with a custom per-line prefix.
-      #
-      # This is help identify what command or handler a particular message came
-      # from when reading syslog.
-      #
-      def log_each_line(log_level, message)
-        time = Time.now.utc.to_s
-
-        log_time = time.to_s
-        justified_log_level = log_level.to_s.upcase.ljust(5)
-        log_chunk = message.to_s.lines.map do |line|
-          # After the first line of the output, emit spaces for easier reading
-          if log_time == last_log_time
-            log_time = " " * log_time.size if log_time == last_log_time
-          else
-            self.last_log_time = log_time
-          end
-          if justified_log_level == last_log_level
-            justified_log_level = " " * justified_log_level.size if justified_log_level == last_log_level
-          else
-            self.last_log_level = justified_log_level
-          end
-          "[#{log_time} #{justified_log_level}] #{line.chomp}\n"
-        end.join("")
-        redis.append("handler_logs:#{handler_id}", log_chunk)
-
-        message.to_s.each_line do |l|
-          log.public_send(log_level, "[#{handler_id}] #{l.chomp}")
-        end
-      end
-
-      #
-      # Send a message to the appropriate place.
-      #
-      # - For Slack messages, errors are sent to the originating user via respond
-      # - For events, errors are sent to the project.channel_name
-      #
-      def send_message(message)
-        if response
-          response.reply(message)
-        else
-          room = message_source
-          robot.send_message(room, message) if room
-        end
-        if http_response
-          message = "#{message}\n" unless message.end_with?("\n")
-          http_response.body << message
-        end
-      end
-
-      def message_source
+      def lita_target(response)
+        return response.message.source if response
         if project && project[:inform_channel]
           @project_room = source_by_name(project[:inform_channel]) unless defined?(@project_room)
           @project_room

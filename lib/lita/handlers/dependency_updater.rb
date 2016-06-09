@@ -30,7 +30,7 @@ module Lita
         "Forget failed dependency update builds (fixes 'waiting for the quiet period to expire before building again')."
       ) do
         project_repo.delete_branch(DEPENDENCY_BRANCH_NAME)
-        info("Deleted local branch #{DEPENDENCY_BRANCH_NAME} of #{project_name}.")
+        output.inform("Deleted local branch #{DEPENDENCY_BRANCH_NAME} of #{project_name}.")
       end
 
       #
@@ -42,8 +42,8 @@ module Lita
       # Event: autobump (update dependencies on timer)
       #
       def update_dependencies_from_timer(proj_name)
+        self.project_name = proj_name
         handle "autobump timer for #{proj_name}" do
-          self.project_name = proj_name
           debug("Running scheduled dependency update for #{project_name}")
           update_dependencies
         end
@@ -71,9 +71,9 @@ module Lita
               handler.update_dependencies_from_timer(project)
             end
           end
-
-          every(config.polling_interval, &timer_fired)
         end
+
+        every(config.polling_interval, &timer_fired)
       end
 
       def update_dependencies
@@ -97,7 +97,7 @@ module Lita
         success = trigger_build("#{project_name}-trigger-ad_hoc", DEPENDENCY_BRANCH_NAME)
         msg = "Started dependency update build for project #{project_name}.\n" +
           "Diff: https://github.com/chef/#{project_name}/compare/auto_dependency_bump_test"
-        info(msg)
+        output.inform(msg)
         true
       end
 

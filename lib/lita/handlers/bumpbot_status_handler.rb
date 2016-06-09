@@ -16,11 +16,14 @@ module Lita
       ) do
         running_handlers = self.running_handlers.reject { |handler| handler == self }
         if running_handlers.any?
-          running_handlers.sort_by { |handler| [ handler.start_time, handler.handler_id.to_i ] }.reverse_each do |handler|
-            info("#{handler.title} running since #{how_long_ago(handler.start_time)}. <#{config.lita_url}/bumpbot/handlers/#{handler.handler_id}/handler.log|Log> <#{config.lita_url}/bumpbot/handlers/#{handler.handler_id}/sandbox.tgz|Download Sandbox>")
+          running_handlers.sort_by! { |handler| [ handler.start_time, handler.handler_id.to_i ] }
+          running_handlers.reverse!
+          attachments = running_handlers.map do |handler|
+            { text: handler.title, ts: handler.start_time.to_i }
           end
+          output.respond(attachments: attachments)
         else
-          info("No command or event handlers are running right now.")
+          output.respond("No command or event handlers are running right now.")
         end
       end
 
@@ -52,24 +55,32 @@ module Lita
         range = Range.new(handlers.size, range.max) if range.min && range.min > handlers.size
 
         if handlers.any?
+          attachments = []
           handlers.each_with_index do |(handler_id, handler, title, start_time, end_time, failed), index|
             next unless range.include?(index + 1)
+            attachment = {}
             if end_time
               if failed
-                status = "failed #{how_long_ago(start_time)} after #{format_duration(end_time - start_time)}"
+                attachment[:color] = "danger"
+                status = "failed after #{format_duration(end_time - start_time)}"
               else
-                status = "succeeded #{how_long_ago(start_time)} after #{format_duration(end_time - start_time)}"
+                attachment[:color] = "good"
+                status = "succeeded after #{format_duration(end_time - start_time)}"
               end
             else
-              status = "running since #{how_long_ago(start_time)}"
+              attachment[:color] = "warning"
+              status = "running"
             end
-            info("#{title} #{status}. <#{config.lita_url}/bumpbot/handlers/#{handler_id}/handler.log|Log> <#{config.lita_url}/bumpbot/handlers/#{handler_id}/sandbox.tgz|Download Sandbox>")
+            attachment[:text] = "#{title} #{status}. <#{config.lita_url}/bumpbot/handlers/#{handler_id}/handler.log|Log>"
+            attachment[:ts] = start_time.to_i
+            attachments << attachment
           end
-          if handlers.size > range.max
-            info("This is only handlers #{range.min}-#{range.max} out of #{handlers.size}. To show the next 10, say \"handlers #{range.max + 1}-#{range.max + 11}\".")
-          end
+
+          output.respond("Handlers #{range.min}-#{range.max} of #{handlers.size} displayed. To show the next 10, say \"handlers #{range.max + 1}-#{range.max + 11}\".",
+            attachments: attachments
+          )
         else
-          info("The system is not running any handlers, and nothing has failed, so there is no handler history to show.")
+          output.respond("The system is not running any handlers, and nothing has failed, so there is no handler history to show.")
         end
       end
 
