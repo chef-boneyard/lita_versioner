@@ -36,8 +36,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
 
   # Allow things to take 1 second extra and still match
   def one_second_slop(log)
-    log = log.gsub("1 second ago", "just now")
-    log.gsub("3 seconds ago", "2 seconds ago")
+    log.gsub("after 1 second", "after 0 seconds")
   end
 
   with_jenkins_server "http://manhattan.ci.chef.co"
@@ -47,8 +46,9 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
       send_command("bumpbot running handlers blarghle")
 
       expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
-        **ERROR:** Too many arguments (1 for 0)!
+        Too many arguments (1 for 0)!
         Usage: bumpbot running handlers   - Get the list of running handlers in bumpbot
+        Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
       EOM
     end
 
@@ -56,8 +56,9 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
       send_command("bumpbot handlers 1-2 blarghle")
 
       expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
-        **ERROR:** Too many arguments (2 for 1)!
+        Too many arguments (2 for 1)!
         Usage: bumpbot handlers [RANGE]   - Get the list of running and failed handlers in bumpbot (corresponds to the list of failed commands). Optional RANGE will get you a list of handlers. Default range is 1-10.
+        Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
       EOM
     end
 
@@ -99,18 +100,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         handler_thread.join
 
         expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
-          handling command "test wait" from Test User running since just now. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
-        EOM
-      end
-
-      it "bumpbot running handlers shows 2 seconds ago after 2 seconds" do
-        sleep(2)
-        send_command("bumpbot running handlers")
-        handler.stop
-        handler_thread.join
-
-        expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
-          handling command "test wait" from Test User running since 2 seconds ago. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
+          Running `test wait` for @Test User
         EOM
       end
 
@@ -121,18 +111,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         handler_thread.join
 
         expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
-          handling command "test wait" from Test User running since just now. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
-        EOM
-      end
-
-      it "bumpbot handlers shows 2 seconds ago after 2 seconds" do
-        sleep(2)
-        send_command("bumpbot handlers")
-        handler.stop
-        handler_thread.join
-
-        expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
-          handling command "test wait" from Test User running since 2 seconds ago. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
+          Running `test wait` for @Test User in progress. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log>
         EOM
       end
 
@@ -148,8 +127,8 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
 
         expect(response.status).to eq(200)
         expect(strip_log_data(response.body)).to eq(strip_eom_block(<<-EOM))
-          [DEBUG] Started handling command "test wait" from Test User
-          [     ] Completed handling command "test wait" from Test User in 00:00:00
+          [DEBUG] Started Running `test wait` for @Test User
+          [     ] Completed Running `test wait` for @Test User in 0 seconds
           [     ] Cleaned up sandbox directory /TMPDIR/cache/sandbox/1 after successful command ...
         EOM
       end
@@ -172,7 +151,7 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         send_command("bumpbot handlers")
 
         expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
-          handling command "test command" from Test User succeeded just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
+          Running `test command` for @Test User succeeded after 0 seconds. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log>
         EOM
       end
 
@@ -180,8 +159,8 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         response = http.get("/bumpbot/handlers/1/handler.log")
         expect(response.status).to eq(200)
         expect(strip_log_data(response.body)).to eq(strip_eom_block(<<-EOM))
-          [DEBUG] Started handling command "test command" from Test User
-          [     ] Completed handling command "test command" from Test User in 00:00:00
+          [DEBUG] Started Running `test command` for @Test User
+          [     ] Completed Running `test command` for @Test User in 0 seconds
           [     ] Cleaned up sandbox directory /TMPDIR/cache/sandbox/1 after successful command ...
         EOM
       end
@@ -196,7 +175,8 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         send_command("bumpbot running handlers")
 
         expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
-          **ERROR:** failed_miserably
+          failed_miserably
+          Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
           No command or event handlers are running right now.
         EOM
       end
@@ -205,21 +185,9 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         send_command("bumpbot handlers")
 
         expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
-          **ERROR:** failed_miserably
-          handling command "test command failed_miserably" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
-        EOM
-      end
-
-      it "bumpbot handlers shows 2 seconds ago after 2 seconds have passed" do
-        sleep(2)
-        send_command("test command failed_just_now")
-        send_command("bumpbot handlers")
-
-        expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
-          **ERROR:** failed_miserably
-          **ERROR:** failed_just_now
-          handling command "test command failed_just_now" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/2/handler.log|Log> <http://localhost:8080/bumpbot/handlers/2/sandbox.tgz|Download Sandbox>
-          handling command "test command failed_miserably" from Test User failed 2 seconds ago after 00:00:00. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
+          failed_miserably
+          Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
+          Running `test command failed_miserably` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log>
         EOM
       end
 
@@ -227,9 +195,9 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         response = http.get("/bumpbot/handlers/1/handler.log")
         expect(response.status).to eq(200)
         expect(strip_log_data(response.body)).to eq(strip_eom_block(<<-EOM))
-          [DEBUG] Started handling command "test command failed_miserably" from Test User
+          [DEBUG] Started Running `test command failed_miserably` for @Test User
           [ERROR] failed_miserably
-          [DEBUG] Completed handling command "test command failed_miserably" from Test User in 00:00:00
+          [DEBUG] Completed Running `test command failed_miserably` for @Test User in 0 seconds
         EOM
       end
     end
@@ -245,32 +213,47 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         send_command("bumpbot handlers")
 
         expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
-          **ERROR:** failed1
-          **ERROR:** failed2
-          **ERROR:** failed3
-          **ERROR:** failed4
-          **ERROR:** failed5
-          **ERROR:** failed6
-          **ERROR:** failed7
-          **ERROR:** failed8
-          **ERROR:** failed9
-          **ERROR:** failed10
-          **ERROR:** failed11
-          **ERROR:** failed12
-          **ERROR:** failed13
-          **ERROR:** failed14
-          **ERROR:** failed15
-          handling command "test command failed15" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/15/handler.log|Log> <http://localhost:8080/bumpbot/handlers/15/sandbox.tgz|Download Sandbox>
-          handling command "test command failed14" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/14/handler.log|Log> <http://localhost:8080/bumpbot/handlers/14/sandbox.tgz|Download Sandbox>
-          handling command "test command failed13" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/13/handler.log|Log> <http://localhost:8080/bumpbot/handlers/13/sandbox.tgz|Download Sandbox>
-          handling command "test command failed12" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/12/handler.log|Log> <http://localhost:8080/bumpbot/handlers/12/sandbox.tgz|Download Sandbox>
-          handling command "test command failed11" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/11/handler.log|Log> <http://localhost:8080/bumpbot/handlers/11/sandbox.tgz|Download Sandbox>
-          handling command "test command failed10" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/10/handler.log|Log> <http://localhost:8080/bumpbot/handlers/10/sandbox.tgz|Download Sandbox>
-          handling command "test command failed9" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/9/handler.log|Log> <http://localhost:8080/bumpbot/handlers/9/sandbox.tgz|Download Sandbox>
-          handling command "test command failed8" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/8/handler.log|Log> <http://localhost:8080/bumpbot/handlers/8/sandbox.tgz|Download Sandbox>
-          handling command "test command failed7" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/7/handler.log|Log> <http://localhost:8080/bumpbot/handlers/7/sandbox.tgz|Download Sandbox>
-          handling command "test command failed6" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/6/handler.log|Log> <http://localhost:8080/bumpbot/handlers/6/sandbox.tgz|Download Sandbox>
-          This is only handlers 1-10 out of 15. To show the next 10, say "handlers 11-21".
+          failed1
+          Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
+          failed2
+          Failed. <http://localhost:8080/bumpbot/handlers/2/handler.log|Full log available here.>
+          failed3
+          Failed. <http://localhost:8080/bumpbot/handlers/3/handler.log|Full log available here.>
+          failed4
+          Failed. <http://localhost:8080/bumpbot/handlers/4/handler.log|Full log available here.>
+          failed5
+          Failed. <http://localhost:8080/bumpbot/handlers/5/handler.log|Full log available here.>
+          failed6
+          Failed. <http://localhost:8080/bumpbot/handlers/6/handler.log|Full log available here.>
+          failed7
+          Failed. <http://localhost:8080/bumpbot/handlers/7/handler.log|Full log available here.>
+          failed8
+          Failed. <http://localhost:8080/bumpbot/handlers/8/handler.log|Full log available here.>
+          failed9
+          Failed. <http://localhost:8080/bumpbot/handlers/9/handler.log|Full log available here.>
+          failed10
+          Failed. <http://localhost:8080/bumpbot/handlers/10/handler.log|Full log available here.>
+          failed11
+          Failed. <http://localhost:8080/bumpbot/handlers/11/handler.log|Full log available here.>
+          failed12
+          Failed. <http://localhost:8080/bumpbot/handlers/12/handler.log|Full log available here.>
+          failed13
+          Failed. <http://localhost:8080/bumpbot/handlers/13/handler.log|Full log available here.>
+          failed14
+          Failed. <http://localhost:8080/bumpbot/handlers/14/handler.log|Full log available here.>
+          failed15
+          Failed. <http://localhost:8080/bumpbot/handlers/15/handler.log|Full log available here.>
+          Running `test command failed15` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/15/handler.log|Log>
+          Running `test command failed14` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/14/handler.log|Log>
+          Running `test command failed13` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/13/handler.log|Log>
+          Running `test command failed12` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/12/handler.log|Log>
+          Running `test command failed11` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/11/handler.log|Log>
+          Running `test command failed10` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/10/handler.log|Log>
+          Running `test command failed9` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/9/handler.log|Log>
+          Running `test command failed8` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/8/handler.log|Log>
+          Running `test command failed7` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/7/handler.log|Log>
+          Running `test command failed6` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/6/handler.log|Log>
+          1-10 of 15, recent first. For more, say `handlers 11-21`.
         EOM
       end
 
@@ -278,36 +261,51 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         send_command("bumpbot handlers 1-15")
 
         expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
-          **ERROR:** failed1
-          **ERROR:** failed2
-          **ERROR:** failed3
-          **ERROR:** failed4
-          **ERROR:** failed5
-          **ERROR:** failed6
-          **ERROR:** failed7
-          **ERROR:** failed8
-          **ERROR:** failed9
-          **ERROR:** failed10
-          **ERROR:** failed11
-          **ERROR:** failed12
-          **ERROR:** failed13
-          **ERROR:** failed14
-          **ERROR:** failed15
-          handling command "test command failed15" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/15/handler.log|Log> <http://localhost:8080/bumpbot/handlers/15/sandbox.tgz|Download Sandbox>
-          handling command "test command failed14" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/14/handler.log|Log> <http://localhost:8080/bumpbot/handlers/14/sandbox.tgz|Download Sandbox>
-          handling command "test command failed13" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/13/handler.log|Log> <http://localhost:8080/bumpbot/handlers/13/sandbox.tgz|Download Sandbox>
-          handling command "test command failed12" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/12/handler.log|Log> <http://localhost:8080/bumpbot/handlers/12/sandbox.tgz|Download Sandbox>
-          handling command "test command failed11" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/11/handler.log|Log> <http://localhost:8080/bumpbot/handlers/11/sandbox.tgz|Download Sandbox>
-          handling command "test command failed10" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/10/handler.log|Log> <http://localhost:8080/bumpbot/handlers/10/sandbox.tgz|Download Sandbox>
-          handling command "test command failed9" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/9/handler.log|Log> <http://localhost:8080/bumpbot/handlers/9/sandbox.tgz|Download Sandbox>
-          handling command "test command failed8" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/8/handler.log|Log> <http://localhost:8080/bumpbot/handlers/8/sandbox.tgz|Download Sandbox>
-          handling command "test command failed7" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/7/handler.log|Log> <http://localhost:8080/bumpbot/handlers/7/sandbox.tgz|Download Sandbox>
-          handling command "test command failed6" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/6/handler.log|Log> <http://localhost:8080/bumpbot/handlers/6/sandbox.tgz|Download Sandbox>
-          handling command "test command failed5" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/5/handler.log|Log> <http://localhost:8080/bumpbot/handlers/5/sandbox.tgz|Download Sandbox>
-          handling command "test command failed4" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/4/handler.log|Log> <http://localhost:8080/bumpbot/handlers/4/sandbox.tgz|Download Sandbox>
-          handling command "test command failed3" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/3/handler.log|Log> <http://localhost:8080/bumpbot/handlers/3/sandbox.tgz|Download Sandbox>
-          handling command "test command failed2" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/2/handler.log|Log> <http://localhost:8080/bumpbot/handlers/2/sandbox.tgz|Download Sandbox>
-          handling command "test command failed1" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
+          failed1
+          Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
+          failed2
+          Failed. <http://localhost:8080/bumpbot/handlers/2/handler.log|Full log available here.>
+          failed3
+          Failed. <http://localhost:8080/bumpbot/handlers/3/handler.log|Full log available here.>
+          failed4
+          Failed. <http://localhost:8080/bumpbot/handlers/4/handler.log|Full log available here.>
+          failed5
+          Failed. <http://localhost:8080/bumpbot/handlers/5/handler.log|Full log available here.>
+          failed6
+          Failed. <http://localhost:8080/bumpbot/handlers/6/handler.log|Full log available here.>
+          failed7
+          Failed. <http://localhost:8080/bumpbot/handlers/7/handler.log|Full log available here.>
+          failed8
+          Failed. <http://localhost:8080/bumpbot/handlers/8/handler.log|Full log available here.>
+          failed9
+          Failed. <http://localhost:8080/bumpbot/handlers/9/handler.log|Full log available here.>
+          failed10
+          Failed. <http://localhost:8080/bumpbot/handlers/10/handler.log|Full log available here.>
+          failed11
+          Failed. <http://localhost:8080/bumpbot/handlers/11/handler.log|Full log available here.>
+          failed12
+          Failed. <http://localhost:8080/bumpbot/handlers/12/handler.log|Full log available here.>
+          failed13
+          Failed. <http://localhost:8080/bumpbot/handlers/13/handler.log|Full log available here.>
+          failed14
+          Failed. <http://localhost:8080/bumpbot/handlers/14/handler.log|Full log available here.>
+          failed15
+          Failed. <http://localhost:8080/bumpbot/handlers/15/handler.log|Full log available here.>
+          Running `test command failed15` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/15/handler.log|Log>
+          Running `test command failed14` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/14/handler.log|Log>
+          Running `test command failed13` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/13/handler.log|Log>
+          Running `test command failed12` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/12/handler.log|Log>
+          Running `test command failed11` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/11/handler.log|Log>
+          Running `test command failed10` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/10/handler.log|Log>
+          Running `test command failed9` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/9/handler.log|Log>
+          Running `test command failed8` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/8/handler.log|Log>
+          Running `test command failed7` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/7/handler.log|Log>
+          Running `test command failed6` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/6/handler.log|Log>
+          Running `test command failed5` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/5/handler.log|Log>
+          Running `test command failed4` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/4/handler.log|Log>
+          Running `test command failed3` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/3/handler.log|Log>
+          Running `test command failed2` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/2/handler.log|Log>
+          Running `test command failed1` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log>
         EOM
       end
 
@@ -315,35 +313,50 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         send_command("bumpbot handlers 2-")
 
         expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
-          **ERROR:** failed1
-          **ERROR:** failed2
-          **ERROR:** failed3
-          **ERROR:** failed4
-          **ERROR:** failed5
-          **ERROR:** failed6
-          **ERROR:** failed7
-          **ERROR:** failed8
-          **ERROR:** failed9
-          **ERROR:** failed10
-          **ERROR:** failed11
-          **ERROR:** failed12
-          **ERROR:** failed13
-          **ERROR:** failed14
-          **ERROR:** failed15
-          handling command "test command failed14" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/14/handler.log|Log> <http://localhost:8080/bumpbot/handlers/14/sandbox.tgz|Download Sandbox>
-          handling command "test command failed13" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/13/handler.log|Log> <http://localhost:8080/bumpbot/handlers/13/sandbox.tgz|Download Sandbox>
-          handling command "test command failed12" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/12/handler.log|Log> <http://localhost:8080/bumpbot/handlers/12/sandbox.tgz|Download Sandbox>
-          handling command "test command failed11" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/11/handler.log|Log> <http://localhost:8080/bumpbot/handlers/11/sandbox.tgz|Download Sandbox>
-          handling command "test command failed10" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/10/handler.log|Log> <http://localhost:8080/bumpbot/handlers/10/sandbox.tgz|Download Sandbox>
-          handling command "test command failed9" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/9/handler.log|Log> <http://localhost:8080/bumpbot/handlers/9/sandbox.tgz|Download Sandbox>
-          handling command "test command failed8" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/8/handler.log|Log> <http://localhost:8080/bumpbot/handlers/8/sandbox.tgz|Download Sandbox>
-          handling command "test command failed7" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/7/handler.log|Log> <http://localhost:8080/bumpbot/handlers/7/sandbox.tgz|Download Sandbox>
-          handling command "test command failed6" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/6/handler.log|Log> <http://localhost:8080/bumpbot/handlers/6/sandbox.tgz|Download Sandbox>
-          handling command "test command failed5" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/5/handler.log|Log> <http://localhost:8080/bumpbot/handlers/5/sandbox.tgz|Download Sandbox>
-          handling command "test command failed4" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/4/handler.log|Log> <http://localhost:8080/bumpbot/handlers/4/sandbox.tgz|Download Sandbox>
-          handling command "test command failed3" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/3/handler.log|Log> <http://localhost:8080/bumpbot/handlers/3/sandbox.tgz|Download Sandbox>
-          handling command "test command failed2" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/2/handler.log|Log> <http://localhost:8080/bumpbot/handlers/2/sandbox.tgz|Download Sandbox>
-          handling command "test command failed1" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
+          failed1
+          Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
+          failed2
+          Failed. <http://localhost:8080/bumpbot/handlers/2/handler.log|Full log available here.>
+          failed3
+          Failed. <http://localhost:8080/bumpbot/handlers/3/handler.log|Full log available here.>
+          failed4
+          Failed. <http://localhost:8080/bumpbot/handlers/4/handler.log|Full log available here.>
+          failed5
+          Failed. <http://localhost:8080/bumpbot/handlers/5/handler.log|Full log available here.>
+          failed6
+          Failed. <http://localhost:8080/bumpbot/handlers/6/handler.log|Full log available here.>
+          failed7
+          Failed. <http://localhost:8080/bumpbot/handlers/7/handler.log|Full log available here.>
+          failed8
+          Failed. <http://localhost:8080/bumpbot/handlers/8/handler.log|Full log available here.>
+          failed9
+          Failed. <http://localhost:8080/bumpbot/handlers/9/handler.log|Full log available here.>
+          failed10
+          Failed. <http://localhost:8080/bumpbot/handlers/10/handler.log|Full log available here.>
+          failed11
+          Failed. <http://localhost:8080/bumpbot/handlers/11/handler.log|Full log available here.>
+          failed12
+          Failed. <http://localhost:8080/bumpbot/handlers/12/handler.log|Full log available here.>
+          failed13
+          Failed. <http://localhost:8080/bumpbot/handlers/13/handler.log|Full log available here.>
+          failed14
+          Failed. <http://localhost:8080/bumpbot/handlers/14/handler.log|Full log available here.>
+          failed15
+          Failed. <http://localhost:8080/bumpbot/handlers/15/handler.log|Full log available here.>
+          Running `test command failed14` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/14/handler.log|Log>
+          Running `test command failed13` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/13/handler.log|Log>
+          Running `test command failed12` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/12/handler.log|Log>
+          Running `test command failed11` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/11/handler.log|Log>
+          Running `test command failed10` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/10/handler.log|Log>
+          Running `test command failed9` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/9/handler.log|Log>
+          Running `test command failed8` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/8/handler.log|Log>
+          Running `test command failed7` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/7/handler.log|Log>
+          Running `test command failed6` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/6/handler.log|Log>
+          Running `test command failed5` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/5/handler.log|Log>
+          Running `test command failed4` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/4/handler.log|Log>
+          Running `test command failed3` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/3/handler.log|Log>
+          Running `test command failed2` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/2/handler.log|Log>
+          Running `test command failed1` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log>
         EOM
       end
 
@@ -351,26 +364,41 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         send_command("bumpbot handlers 11-15")
 
         expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
-          **ERROR:** failed1
-          **ERROR:** failed2
-          **ERROR:** failed3
-          **ERROR:** failed4
-          **ERROR:** failed5
-          **ERROR:** failed6
-          **ERROR:** failed7
-          **ERROR:** failed8
-          **ERROR:** failed9
-          **ERROR:** failed10
-          **ERROR:** failed11
-          **ERROR:** failed12
-          **ERROR:** failed13
-          **ERROR:** failed14
-          **ERROR:** failed15
-          handling command "test command failed5" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/5/handler.log|Log> <http://localhost:8080/bumpbot/handlers/5/sandbox.tgz|Download Sandbox>
-          handling command "test command failed4" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/4/handler.log|Log> <http://localhost:8080/bumpbot/handlers/4/sandbox.tgz|Download Sandbox>
-          handling command "test command failed3" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/3/handler.log|Log> <http://localhost:8080/bumpbot/handlers/3/sandbox.tgz|Download Sandbox>
-          handling command "test command failed2" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/2/handler.log|Log> <http://localhost:8080/bumpbot/handlers/2/sandbox.tgz|Download Sandbox>
-          handling command "test command failed1" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log> <http://localhost:8080/bumpbot/handlers/1/sandbox.tgz|Download Sandbox>
+          failed1
+          Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
+          failed2
+          Failed. <http://localhost:8080/bumpbot/handlers/2/handler.log|Full log available here.>
+          failed3
+          Failed. <http://localhost:8080/bumpbot/handlers/3/handler.log|Full log available here.>
+          failed4
+          Failed. <http://localhost:8080/bumpbot/handlers/4/handler.log|Full log available here.>
+          failed5
+          Failed. <http://localhost:8080/bumpbot/handlers/5/handler.log|Full log available here.>
+          failed6
+          Failed. <http://localhost:8080/bumpbot/handlers/6/handler.log|Full log available here.>
+          failed7
+          Failed. <http://localhost:8080/bumpbot/handlers/7/handler.log|Full log available here.>
+          failed8
+          Failed. <http://localhost:8080/bumpbot/handlers/8/handler.log|Full log available here.>
+          failed9
+          Failed. <http://localhost:8080/bumpbot/handlers/9/handler.log|Full log available here.>
+          failed10
+          Failed. <http://localhost:8080/bumpbot/handlers/10/handler.log|Full log available here.>
+          failed11
+          Failed. <http://localhost:8080/bumpbot/handlers/11/handler.log|Full log available here.>
+          failed12
+          Failed. <http://localhost:8080/bumpbot/handlers/12/handler.log|Full log available here.>
+          failed13
+          Failed. <http://localhost:8080/bumpbot/handlers/13/handler.log|Full log available here.>
+          failed14
+          Failed. <http://localhost:8080/bumpbot/handlers/14/handler.log|Full log available here.>
+          failed15
+          Failed. <http://localhost:8080/bumpbot/handlers/15/handler.log|Full log available here.>
+          Running `test command failed5` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/5/handler.log|Log>
+          Running `test command failed4` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/4/handler.log|Log>
+          Running `test command failed3` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/3/handler.log|Log>
+          Running `test command failed2` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/2/handler.log|Log>
+          Running `test command failed1` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/1/handler.log|Log>
         EOM
       end
 
@@ -378,23 +406,38 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
         send_command("bumpbot handlers 11")
 
         expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
-          **ERROR:** failed1
-          **ERROR:** failed2
-          **ERROR:** failed3
-          **ERROR:** failed4
-          **ERROR:** failed5
-          **ERROR:** failed6
-          **ERROR:** failed7
-          **ERROR:** failed8
-          **ERROR:** failed9
-          **ERROR:** failed10
-          **ERROR:** failed11
-          **ERROR:** failed12
-          **ERROR:** failed13
-          **ERROR:** failed14
-          **ERROR:** failed15
-          handling command "test command failed5" from Test User failed just now after 00:00:00. <http://localhost:8080/bumpbot/handlers/5/handler.log|Log> <http://localhost:8080/bumpbot/handlers/5/sandbox.tgz|Download Sandbox>
-          This is only handlers 11-11 out of 15. To show the next 10, say "handlers 12-22".
+          failed1
+          Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
+          failed2
+          Failed. <http://localhost:8080/bumpbot/handlers/2/handler.log|Full log available here.>
+          failed3
+          Failed. <http://localhost:8080/bumpbot/handlers/3/handler.log|Full log available here.>
+          failed4
+          Failed. <http://localhost:8080/bumpbot/handlers/4/handler.log|Full log available here.>
+          failed5
+          Failed. <http://localhost:8080/bumpbot/handlers/5/handler.log|Full log available here.>
+          failed6
+          Failed. <http://localhost:8080/bumpbot/handlers/6/handler.log|Full log available here.>
+          failed7
+          Failed. <http://localhost:8080/bumpbot/handlers/7/handler.log|Full log available here.>
+          failed8
+          Failed. <http://localhost:8080/bumpbot/handlers/8/handler.log|Full log available here.>
+          failed9
+          Failed. <http://localhost:8080/bumpbot/handlers/9/handler.log|Full log available here.>
+          failed10
+          Failed. <http://localhost:8080/bumpbot/handlers/10/handler.log|Full log available here.>
+          failed11
+          Failed. <http://localhost:8080/bumpbot/handlers/11/handler.log|Full log available here.>
+          failed12
+          Failed. <http://localhost:8080/bumpbot/handlers/12/handler.log|Full log available here.>
+          failed13
+          Failed. <http://localhost:8080/bumpbot/handlers/13/handler.log|Full log available here.>
+          failed14
+          Failed. <http://localhost:8080/bumpbot/handlers/14/handler.log|Full log available here.>
+          failed15
+          Failed. <http://localhost:8080/bumpbot/handlers/15/handler.log|Full log available here.>
+          Running `test command failed5` for @Test User failed after 0 seconds. <http://localhost:8080/bumpbot/handlers/5/handler.log|Log>
+          11-11 of 15, recent first. For more, say `handlers 12-22`.
         EOM
       end
     end

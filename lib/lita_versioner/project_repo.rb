@@ -74,17 +74,19 @@ module LitaVersioner
 
     def tag_and_commit
       version = read_version
+      tag = "v#{version}"
 
       ensure_git_config_set
 
       run_command(%w{git add -A})
       run_command(%w{git commit -m} + ["Bump version of #{repo_name} to #{version} by Chef Versioner."])
-      run_command(%W{git tag -a v#{version} -m} + ["Version tag for #{version}."])
+      run_command(%W{git tag -a #{tag} -m} + ["Version tag for #{version}."])
       begin
         run_command(%w{git push origin master --tags})
+        tag
       rescue
         # We need to cleanup the local tag we have created if the push has failed.
-        run_command(%W{git tag -d v#{version}})
+        run_command(%W{git tag -d #{tag}})
         raise
       end
     end

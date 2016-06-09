@@ -30,7 +30,7 @@ module Lita
         "Forget failed dependency update builds (fixes 'waiting for the quiet period to expire before building again')."
       ) do
         project_repo.delete_branch(DEPENDENCY_BRANCH_NAME)
-        output.inform("Deleted local branch #{DEPENDENCY_BRANCH_NAME} of #{project_name}.")
+        respond("Deleted local branch #{DEPENDENCY_BRANCH_NAME} of #{project_name}.")
       end
 
       #
@@ -64,12 +64,12 @@ module Lita
             debug("Polling is disabled. Dependency updates will run from chat command only")
             return false
           end
+        end
 
-          timer_fired = proc do |timer|
-            projects.keys.each do |project|
-              handler = DependencyUpdater.new(robot)
-              handler.update_dependencies_from_timer(project)
-            end
+        timer_fired = proc do |timer|
+          projects.keys.each do |project|
+            handler = DependencyUpdater.new(robot)
+            handler.update_dependencies_from_timer(project)
           end
         end
 
@@ -85,7 +85,7 @@ module Lita
                                                        target_git_ref: DEPENDENCY_BRANCH_NAME)
         if conflict_checker.conflicting_build_running?
           warn("Dependency update build not triggered: conflicting build in progress.")
-          return false
+          return
         end
 
         dep_builder = DependencyUpdateBuilder.new(handler: self,
@@ -94,11 +94,9 @@ module Lita
         dependencies_updated, reason = dep_builder.run
         rate_limited_error!("Dependency update build not triggered: #{reason}") unless dependencies_updated
 
-        success = trigger_build("#{project_name}-trigger-ad_hoc", DEPENDENCY_BRANCH_NAME)
-        msg = "Started dependency update build for project #{project_name}.\n" +
-          "Diff: https://github.com/chef/#{project_name}/compare/auto_dependency_bump_test"
-        output.inform(msg)
-        true
+        trigger_build("#{project_name}-trigger-ad_hoc", DEPENDENCY_BRANCH_NAME)
+        branch_url = "https://github.com/chef/#{project_name}/compare/auto_dependency_bump_test"
+        respond("<#{branch_url}|Updated dependencies> and triggered ad-hoc build for project #{project_name}.")
       end
 
       def failure_notification_rate_limit_file
@@ -133,7 +131,7 @@ module Lita
           debug(message)
           raise ErrorAlreadyReported.new(message)
         else
-          error!(message)
+          respond_error!(message)
         end
       end
 

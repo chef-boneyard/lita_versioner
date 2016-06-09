@@ -28,8 +28,9 @@ describe Lita::Handlers::DependencyUpdater, lita_handler: true, additional_lita_
         send_command("update dependencies")
 
         expect(reply_string).to eq(strip_eom_block(<<-EOM))
-          **ERROR:** No project specified!
+          No project specified!
           Usage: update dependencies PROJECT   - Runs the dependency updater and submits a build if there are new dependencies.
+          Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
         EOM
       end
 
@@ -37,8 +38,9 @@ describe Lita::Handlers::DependencyUpdater, lita_handler: true, additional_lita_
         send_command("update dependencies blarghle")
 
         expect(reply_string).to eq(strip_eom_block(<<-EOM))
-          **ERROR:** Invalid project blarghle. Valid projects: lita-test.
+          Invalid project blarghle. Valid projects: lita-test.
           Usage: update dependencies PROJECT   - Runs the dependency updater and submits a build if there are new dependencies.
+          Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
         EOM
       end
 
@@ -46,8 +48,9 @@ describe Lita::Handlers::DependencyUpdater, lita_handler: true, additional_lita_
         send_command("update dependencies lita-test blarghle")
 
         expect(reply_string).to eq(strip_eom_block(<<-EOM))
-          **ERROR:** Too many arguments (2 for 1)!
+          Too many arguments (2 for 1)!
           Usage: update dependencies PROJECT   - Runs the dependency updater and submits a build if there are new dependencies.
+          Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
         EOM
       end
     end
@@ -99,9 +102,7 @@ describe Lita::Handlers::DependencyUpdater, lita_handler: true, additional_lita_
               send_command("update dependencies lita-test")
 
               expect(reply_string).to eq(strip_eom_block(<<-EOM))
-                Checking for updated dependencies for lita-test...
-                Started dependency update build for project lita-test.
-                Diff: https://github.com/chef/lita-test/compare/auto_dependency_bump_test
+                <https://github.com/chef/lita-test/compare/auto_dependency_bump_test|Updated dependencies> and triggered ad-hoc build for project lita-test.
               EOM
 
               expect(git_file(git_remote, "deps.txt", ref: "auto_dependency_bump_test")).to eq("A")
@@ -116,9 +117,8 @@ describe Lita::Handlers::DependencyUpdater, lita_handler: true, additional_lita_
                 send_command("update dependencies lita-test")
 
                 expect(reply_string).to eq(strip_eom_block(<<-EOM))
-                  Checking for updated dependencies for lita-test...
-                  dependencies on master are up to date
-                  **ERROR:** Dependency update build not triggered: dependencies on master are up to date
+                  Dependency update build not triggered: dependencies on master are up to date
+                  Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
                 EOM
                 expect(git_file(git_remote, "deps.txt")).to eq("A")
               end
@@ -131,9 +131,7 @@ describe Lita::Handlers::DependencyUpdater, lita_handler: true, additional_lita_
                 send_command("update dependencies lita-test")
 
                 expect(reply_string).to eq(strip_eom_block(<<-EOM))
-                  Checking for updated dependencies for lita-test...
-                  Started dependency update build for project lita-test.
-                  Diff: https://github.com/chef/lita-test/compare/auto_dependency_bump_test
+                  <https://github.com/chef/lita-test/compare/auto_dependency_bump_test|Updated dependencies> and triggered ad-hoc build for project lita-test.
                 EOM
 
                 expect(git_file(git_remote, "deps.txt", ref: "auto_dependency_bump_test")).to eq("A")
@@ -159,9 +157,7 @@ describe Lita::Handlers::DependencyUpdater, lita_handler: true, additional_lita_
               send_command("update dependencies lita-test")
 
               expect(reply_string).to eq(strip_eom_block(<<-EOM))
-                Checking for updated dependencies for lita-test...
-                Started dependency update build for project lita-test.
-                Diff: https://github.com/chef/lita-test/compare/auto_dependency_bump_test
+                <https://github.com/chef/lita-test/compare/auto_dependency_bump_test|Updated dependencies> and triggered ad-hoc build for project lita-test.
               EOM
 
               expect(git_file(git_remote, "deps.txt", ref: "auto_dependency_bump_test")).to eq("A")
@@ -194,9 +190,7 @@ describe Lita::Handlers::DependencyUpdater, lita_handler: true, additional_lita_
               send_command("update dependencies lita-test")
 
               expect(reply_string).to eq(strip_eom_block(<<-EOM))
-                Checking for updated dependencies for lita-test...
-                Started dependency update build for project lita-test.
-                Diff: https://github.com/chef/lita-test/compare/auto_dependency_bump_test
+                <https://github.com/chef/lita-test/compare/auto_dependency_bump_test|Updated dependencies> and triggered ad-hoc build for project lita-test.
               EOM
 
               expect(git_file(git_remote, "deps.txt", ref: "auto_dependency_bump_test")).to eq("A")
@@ -228,9 +222,7 @@ describe Lita::Handlers::DependencyUpdater, lita_handler: true, additional_lita_
                 send_command("update dependencies lita-test")
 
                 expect(reply_string).to eq(strip_eom_block(<<-EOM))
-                  Checking for updated dependencies for lita-test...
-                  Started dependency update build for project lita-test.
-                  Diff: https://github.com/chef/lita-test/compare/auto_dependency_bump_test
+                  <https://github.com/chef/lita-test/compare/auto_dependency_bump_test|Updated dependencies> and triggered ad-hoc build for project lita-test.
                 EOM
 
                 expect(git_file(git_remote, "deps.txt", ref: "auto_dependency_bump_test")).to eq("A")
@@ -261,8 +253,6 @@ describe Lita::Handlers::DependencyUpdater, lita_handler: true, additional_lita_
                 send_command("update dependencies lita-test")
 
                 expect(reply_string).to eq(strip_eom_block(<<-EOM))
-                  Checking for updated dependencies for lita-test...
-                  WARN: Dependency update build not triggered: conflicting build in progress.
                 EOM
                 expect(git_file(git_remote, "deps.txt", ref: "auto_dependency_bump_test")).to eq("Y")
               end
@@ -291,8 +281,6 @@ describe Lita::Handlers::DependencyUpdater, lita_handler: true, additional_lita_
                 send_command("update dependencies lita-test")
 
                 expect(reply_string).to eq(strip_eom_block(<<-EOM))
-                  Checking for updated dependencies for lita-test...
-                  WARN: Dependency update build not triggered: conflicting build in progress.
                 EOM
                 expect(git_file(git_remote, "deps.txt", ref: "auto_dependency_bump_test")).to eq("Y")
               end
@@ -320,8 +308,6 @@ describe Lita::Handlers::DependencyUpdater, lita_handler: true, additional_lita_
                 send_command("update dependencies lita-test")
 
                 expect(reply_string).to eq(strip_eom_block(<<-EOM))
-                  Checking for updated dependencies for lita-test...
-                  WARN: Dependency update build not triggered: conflicting build in progress.
                 EOM
                 expect(git_file(git_remote, "deps.txt", ref: "auto_dependency_bump_test")).to eq("Y")
               end
@@ -348,8 +334,6 @@ describe Lita::Handlers::DependencyUpdater, lita_handler: true, additional_lita_
                 send_command("update dependencies lita-test")
 
                 expect(reply_string).to eq(strip_eom_block(<<-EOM))
-                  Checking for updated dependencies for lita-test...
-                  WARN: Dependency update build not triggered: conflicting build in progress.
                 EOM
                 expect(git_file(git_remote, "deps.txt", ref: "auto_dependency_bump_test")).to eq("Y")
               end
@@ -381,8 +365,6 @@ describe Lita::Handlers::DependencyUpdater, lita_handler: true, additional_lita_
                 send_command("update dependencies lita-test")
 
                 expect(reply_string).to eq(strip_eom_block(<<-EOM))
-                  Checking for updated dependencies for lita-test...
-                  WARN: Dependency update build not triggered: conflicting build in progress.
                 EOM
                 expect(git_file(git_remote, "deps.txt", ref: "auto_dependency_bump_test")).to eq("Y")
               end
@@ -415,9 +397,7 @@ describe Lita::Handlers::DependencyUpdater, lita_handler: true, additional_lita_
               send_command("update dependencies lita-test")
 
               expect(reply_string).to eq(strip_eom_block(<<-EOM))
-                Checking for updated dependencies for lita-test...
-                Started dependency update build for project lita-test.
-                Diff: https://github.com/chef/lita-test/compare/auto_dependency_bump_test
+                <https://github.com/chef/lita-test/compare/auto_dependency_bump_test|Updated dependencies> and triggered ad-hoc build for project lita-test.
               EOM
             end
           end

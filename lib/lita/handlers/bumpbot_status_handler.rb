@@ -19,11 +19,11 @@ module Lita
           running_handlers.sort_by! { |handler| [ handler.start_time, handler.handler_id.to_i ] }
           running_handlers.reverse!
           attachments = running_handlers.map do |handler|
-            { text: handler.title, ts: handler.start_time.to_i }
+            { color: "warning", text: handler.title, ts: handler.start_time.to_i }
           end
-          output.respond(attachments: attachments)
+          respond(attachments: attachments)
         else
-          output.respond("No command or event handlers are running right now.")
+          respond("No command or event handlers are running right now.")
         end
       end
 
@@ -69,18 +69,22 @@ module Lita
               end
             else
               attachment[:color] = "warning"
-              status = "running"
+              status = "in progress"
             end
             attachment[:text] = "#{title} #{status}. <#{config.lita_url}/bumpbot/handlers/#{handler_id}/handler.log|Log>"
             attachment[:ts] = start_time.to_i
             attachments << attachment
           end
 
-          output.respond("Handlers #{range.min}-#{range.max} of #{handlers.size} displayed. To show the next 10, say \"handlers #{range.max + 1}-#{range.max + 11}\".",
-            attachments: attachments
-          )
+          if range.max < handlers.size
+            attachments << {
+              color: "good",
+              footer: "#{range.min}-#{range.max} of #{handlers.size}, recent first. For more, say `handlers #{range.max + 1}-#{range.max + 11}`.",
+            }
+          end
+          respond(attachments: attachments)
         else
-          output.respond("The system is not running any handlers, and nothing has failed, so there is no handler history to show.")
+          respond("The system is not running any handlers, and nothing has failed, so there is no handler history to show.")
         end
       end
 

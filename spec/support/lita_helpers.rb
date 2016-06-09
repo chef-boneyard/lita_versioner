@@ -49,7 +49,7 @@ module Lita
     class TestWaitHandler < BumpbotHandler
       command_route "test wait", "Waits until signalled.", max_args: 1, project_arg: false do |failure|
         wait_for.wait(mutex)
-        error!(failure) if failure
+        respond_error!(failure) if failure
       end
 
       def initialize(*args)
@@ -70,7 +70,7 @@ module Lita
 
     class TestCommandHandler < BumpbotHandler
       command_route "test command", "Runs through, or fails if given a message to fail with.", max_args: 1, project_arg: false do |failure|
-        error!(failure) if failure
+        respond_error!(failure) if failure
       end
     end
   end

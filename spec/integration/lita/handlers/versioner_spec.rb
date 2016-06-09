@@ -39,26 +39,29 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
     it "build with no arguments emits a reasonable error message" do
       send_command("build")
 
-      expect(reply_string).to eq(strip_eom_block(<<-EOM))
-        **ERROR:** No project specified!
+      expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
+        No project specified!
         Usage: build PROJECT [GIT_REF]   - Kicks off a build for PROJECT with GIT_REF. GIT_REF default: master.
+        Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
       EOM
     end
 
     it "build blarghle emits a reasonable error message" do
       send_command("build blarghle")
-      expect(reply_string).to eq(strip_eom_block(<<-EOM))
-        **ERROR:** Invalid project blarghle. Valid projects: lita-test.
+      expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
+        Invalid project blarghle. Valid projects: lita-test.
         Usage: build PROJECT [GIT_REF]   - Kicks off a build for PROJECT with GIT_REF. GIT_REF default: master.
+        Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
       EOM
     end
 
     it "build lita-test master blarghle does not build (too many arguments)" do
       send_command("build lita-test master blarghle")
 
-      expect(reply_string).to eq(strip_eom_block(<<-EOM))
-        **ERROR:** Too many arguments (3 for 2)!
+      expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
+        Too many arguments (3 for 2)!
         Usage: build PROJECT [GIT_REF]   - Kicks off a build for PROJECT with GIT_REF. GIT_REF default: master.
+        Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
       EOM
     end
 
@@ -67,7 +70,7 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
 
       send_command("build lita-test")
 
-      expect(reply_string).to eq(strip_eom_block(<<-EOM))
+      expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
         Kicked off a build for 'lita-test-trigger-release' at ref 'master'.
       EOM
     end
@@ -77,7 +80,7 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
 
       send_command("build lita-test example")
 
-      expect(reply_string).to eq(strip_eom_block(<<-EOM))
+      expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
         Kicked off a build for 'lita-test-trigger-ad_hoc' at ref 'example'.
       EOM
     end
@@ -87,27 +90,30 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
     it "build with no arguments emits a reasonable error message" do
       send_command("bump")
 
-      expect(reply_string).to eq(strip_eom_block(<<-EOM))
-        **ERROR:** No project specified!
+      expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
+        No project specified!
         Usage: bump PROJECT   - Bumps the version of PROJECT and starts a build.
+        Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
       EOM
     end
 
     it "build blarghle emits a reasonable error message" do
       send_command("bump blarghle")
 
-      expect(reply_string).to eq(strip_eom_block(<<-EOM))
-        **ERROR:** Invalid project blarghle. Valid projects: lita-test.
+      expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
+        Invalid project blarghle. Valid projects: lita-test.
         Usage: bump PROJECT   - Bumps the version of PROJECT and starts a build.
+        Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
       EOM
     end
 
     it "bump lita-test blarghle does not bump (too many arguments)" do
       send_command("bump lita-test blarghle")
 
-      expect(reply_string).to eq(strip_eom_block(<<-EOM))
-        **ERROR:** Too many arguments (2 for 1)!
+      expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
+        Too many arguments (2 for 1)!
         Usage: bump PROJECT   - Bumps the version of PROJECT and starts a build.
+        Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
       EOM
     end
 
@@ -116,9 +122,8 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
 
       send_command("bump lita-test")
 
-      expect(reply_string).to eq(strip_eom_block(<<-EOM))
-        Bumped version to AA
-        Kicked off release build for 'lita-test-trigger-release' at ref 'vAA'.
+      expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
+        Bumped version of lita-test to </TMPDIR/lita-test/tree/vAA|vAA> and kicked off a release build.
       EOM
 
       expect(git_file(git_remote, "file.txt")).to eq("AA")
@@ -137,11 +142,11 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
     #   send_command("bump lita-test")
     #   t.join
     #
-    #   expect(reply_string).to eq(strip_eom_block(<<-EOM))
+    #   expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
     #     Bumped version to AA
-    #     Kicked off release build for 'lita-test-trigger-release' at ref 'vAA'.
+    #     Bumped version of lita-test to </TMPDIR/lita-test/tree/vAA|vAA> and kicked off a release build.
     #     Bumped version to AA
-    #     Kicked off release build for 'lita-test-trigger-release' at ref 'vAA'.
+    #     Bumped version of lita-test to </TMPDIR/lita-test/tree/vAA|vAA> and kicked off a release build.
     #   EOM
     #
     #   expect(git_file(git_remote, "file.txt")).to eq("AA")
@@ -166,11 +171,9 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
 
       send_command("bump lita-test")
 
-      expect(reply_string).to eq(strip_eom_block(<<-EOM))
-        Bumped version to AA
-        Kicked off release build for 'lita-test-trigger-release' at ref 'vAA'.
-        Bumped version to AAA
-        Kicked off release build for 'lita-test-trigger-release' at ref 'vAAA'.
+      expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
+        Bumped version of lita-test to </TMPDIR/lita-test/tree/vAA|vAA> and kicked off a release build.
+        Bumped version of lita-test to </TMPDIR/lita-test/tree/vAAA|vAAA> and kicked off a release build.
       EOM
 
       expect(git_file(git_remote, "file.txt")).to eq("AAA")
@@ -204,7 +207,7 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
         expect(git_file(git_remote, "file.txt")).to eq("A")
 
         expect(replies).to be_empty
-        expect(response.body).to eq(reply_string)
+        expect(strip_log_data(response.body)).to eq(reply_string)
       end
     end
 
@@ -214,8 +217,9 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
         expect(response.status).to eq(500)
         expect(git_file(git_remote, "file.txt")).to eq("A")
 
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
-          **ERROR:** Repository 'blarghle' is not monitored by versioner!
+        expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
+          Repository 'blarghle' is not monitored by versioner!
+          Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
         EOM
       end
     end
@@ -237,10 +241,9 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
         expect(response.status).to eq(200)
         expect(git_file(git_remote, "file.txt")).to eq("A")
 
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
-          Skipping: 'https://github.com/chef/lita-test/pulls/1'. It was closed without merging any commits.
+        expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
         EOM
-        expect(response.body).to eq(reply_string)
+        expect(strip_log_data(response.body)).to eq(reply_string)
       end
     end
 
@@ -255,12 +258,12 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
 
         expect(git_file(git_remote, "file.txt")).to eq("ZA")
 
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
-          'https://github.com/chef/lita-test/pulls/1' was just merged. Bumping version and submitting a build ...
-          Bumped version to ZA
-          Kicked off release build for 'lita-test-trigger-release' at ref 'vZA'.
+        expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
+          Bumped version of lita-test to </TMPDIR/lita-test/tree/vZA|vZA> and kicked off a release build.
         EOM
-        expect(response.body).to eq(reply_string)
+        expect(strip_log_data(response.body)).to eq(strip_eom_block(<<-EOM))
+          Bumped version of lita-test to </TMPDIR/lita-test/tree/vZA|vZA> and kicked off a release build.
+        EOM
       end
 
       it "when another commit has been created before the merge is triggered, it fails to push but then handles the next merge" do
@@ -269,7 +272,7 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
 
         response = post_github_event("pull_request", "lita-test", "closed", true, sha: sha1)
         expect(response.status).to eq(200)
-        expect(response.body.strip).to eq("WARN: Skipping: 'https://github.com/chef/lita-test/pulls/1'. Latest master is at SHA 5a6d2b42c1d26c11616a4c07eb44ead0483661ae, but the pull request merged SHA 23da147c3c4244d787a02e792d7649c6b5ad7acd")
+        expect(response.body.strip).to eq("")
 
         expect(git_file(git_remote, "file.txt")).to eq("ZZ")
 
@@ -279,13 +282,13 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
         expect(response2.status).to eq(200)
 
         expect(git_file(git_remote, "file.txt")).to eq("ZZA")
-        expect(response2.body).to eq(strip_eom_block(<<-EOM))
-          'https://github.com/chef/lita-test/pulls/2' was just merged. Bumping version and submitting a build ...
-          Bumped version to ZZA
-          Kicked off release build for 'lita-test-trigger-release' at ref 'vZZA'.
+        expect(strip_log_data(response2.body)).to eq(strip_eom_block(<<-EOM))
+          Bumped version of lita-test to </TMPDIR/lita-test/tree/vZZA|vZZA> and kicked off a release build.
         EOM
 
-        expect(reply_string).to eq("#{response.body}#{response2.body}")
+        expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
+          Bumped version of lita-test to </TMPDIR/lita-test/tree/vZZA|vZZA> and kicked off a release build.
+        EOM
       end
     end
   end
