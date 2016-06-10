@@ -70,7 +70,7 @@ module Lita
 
         self.project_name = projects.keys.find do |name|
           repo = File.basename(projects[name][:github_url])
-          repo = repo[0..-4] if repo.end_with?(".git")
+          repo = repo[0..-5] if repo.end_with?(".git")
           repo == repository
         end
 
