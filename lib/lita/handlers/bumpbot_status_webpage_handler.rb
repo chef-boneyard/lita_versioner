@@ -10,7 +10,7 @@ module Lita
       # Webpage: /bumpbot/handlers/:id/handler.log
       #
       http.get "/bumpbot/handlers/:id/handler.log" do |request, response|
-        self.http_response = response
+        output.http_response = response
         handler_id = request.env["router.params"][:id]
         handle "Webpage /bumpbot/handlers/#{handler_id}/handler.log" do
           handler_log = File.join(config.sandbox_directory, handler_id.to_s, "handler.log")
@@ -25,7 +25,7 @@ module Lita
               sleep(0.1)
             end
           rescue Errno::ENOENT
-            error!("#{handler_log} not found", status: "404")
+            respond_error!("#{handler_log} not found", status: "404")
           end
         end
       end
@@ -34,12 +34,12 @@ module Lita
       # Webpage: /bumpbot/handlers/:id/sandbox.tgz
       #
       http.get "/bumpbot/handlers/:id/sandbox.tgz" do |request, response|
-        self.http_response = response
+        output.http_response = response
         handler_id = request.env["router.params"][:id]
         handle "Webpage /bumpbot/handlers/#{handler_id}/sandbox.tgz" do
           handler_sandbox = File.join(config.sandbox_directory, handler_id)
           unless File.exist?(handler_sandbox)
-            error!("#{sandbox_directory} not found", status: "404")
+            respond_error!("#{sandbox_directory} not found", status: "404")
           end
           tarfile = File.join(sandbox_directory, "sandbox.tgz")
           run_command "tar czvf #{tarfile} #{handler_sandbox}"

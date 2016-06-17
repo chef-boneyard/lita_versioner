@@ -6,6 +6,7 @@ require "shellwords"
 require "set"
 require_relative "../../lita_versioner"
 require_relative "../../lita_versioner/format_helpers"
+require_relative "../../lita_versioner/handler_output"
 require_relative "../../lita_versioner/jenkins_http"
 
 module Lita
@@ -32,9 +33,9 @@ module Lita
       config :success_log_ttl, default: 60 * 60 * 24 * 7
       config :failure_log_ttl, default: 60 * 60 * 24 * 60
 
-      attr_accessor :project_name
+      attr_reader :output
       attr_reader :response
-      attr_accessor :http_response
+      attr_accessor :project_name
       attr_reader :start_time
       attr_reader :title
 
@@ -43,28 +44,88 @@ module Lita
       #
       attr_reader :handler_id
 
-      def self.inherited(klass)
-        super
-        klass.namespace("versioner")
-      end
+      #
+      # Optional command arguments if this handler is a command handler.
+      #
+      attr_reader :command_args
 
-      def self.reset!
-        @@running_handlers = Set.new
-      end
-      reset!
-
-      def self.running_handlers
-        @@running_handlers
-      end
-
-      def running_handlers
-        @@running_handlers
-      end
+      #
+      # Cache directory for this handler instance
+      #
+      attr_reader :sandbox_directory
 
       # Give the handler a monotonically increasing ID
       def initialize(*args)
         super
         @handler_id = redis.incr("max_handler_id")
+        @output = LitaVersioner::HandlerOutput.new(self)
+      end
+
+      # Get the github web URL to the project (strip .git)
+      def project_github_url
+        if project && project[:github_url]
+          if project[:github_url].end_with?(".git")
+            project[:github_url[-5..-1]]
+          else
+            project[:github_url]
+          end
+        end
+      end
+
+      #
+      # Create a new handler which will send messages and HTTP responses to the
+      # same place as the original.
+      #
+      # Versioner.from_handler(handler) will create a Versioner object;
+      # DependencyUpdater.from_handler(handler) will create a DependencyUpdater
+      # object; etc. etc.
+      #
+      def self.from_handler(handler)
+        result = new(handler.robot)
+        result.inherit_handler(handler)
+        result
+      end
+
+      #
+      # Inherit response and output information from another handler (see `from_handler`)
+      #
+      def inherit_handler(handler)
+        @project_name = handler.project_name
+        @response = handler.response
+        output.inherit_output(handler.output)
+      end
+
+      #
+      # Ensure all subclasses are in the Lita versioner namespace so they share config.
+      #
+      def self.inherited(klass)
+        super
+        klass.namespace("versioner")
+      end
+
+      extend Forwardable
+
+      # User outputs (Slack)
+      def_delegators :output, :respond, :inform, :inform_error, :respond_error!
+      # Log outputs
+      def_delegators :output, :error, :warn, :info, :debug
+
+      #
+      # The Project config for the current project
+      #
+      def project
+        projects[project_name]
+      end
+
+      #
+      # The full list of configured projects
+      #
+      def projects
+        config.projects
+      end
+
+      def log_url
+        "#{config.lita_url}/bumpbot/handlers/#{handler_id}/handler.log"
       end
 
       #
@@ -111,24 +172,19 @@ module Lita
       end
 
       #
-      # Cache directory for this handler instance
-      #
-      attr_reader :sandbox_directory
-
-      #
       # Callback wrapper for handlers.
       #
       # @param title The event title.
       # @return whatever the provided block returns.
       #
-      def handle(title, response: nil, &block)
+      def handle(title, &block)
         if running_handlers.include?(self)
-          raise "Cannot call handle_event or handle_command twice for a single handler! Already running #{title.inspect}, and asked to run #{self.title.inspect}"
+          raise "Cannot call handle or handle_command twice for a single handler! Already running #{self.title.inspect}, but asked to run #{title.inspect}"
         end
 
+        output.lita_target ||= lita_target(nil)
         @title = title
         @start_time = Time.now.utc
-        @response = response
         running_handlers << self
         redis.hmset("handlers:#{handler_id}",
                     "title", title,
@@ -136,6 +192,7 @@ module Lita
         # Assume we will fail, and set the log to expire in failure_ttl
         redis.set("handler_logs:#{handler_id}", "", ex: config.failure_log_ttl)
 
+        output.started
         create_sandbox_directory
         debug("Started #{title}")
 
@@ -151,16 +208,23 @@ module Lita
         # Set successful logs to expire earlier
         redis.expire("handler_logs:#{handler_id}", config.success_log_ttl)
 
+        output.finished
+
       # In case of an error, report it and set result to FAILURE
       rescue
         end_time = Time.now.utc
         begin
           unless ErrorAlreadyReported === $!
-            msg = "Unhandled error while #{title}:\n" +
-              "```#{$!}\n#{$!.backtrace.join("\n")}```."
-            error(msg)
+            error_string = $!.to_s
+            if error_string.include?("\n")
+              inform_error("Unhandled error while #{title}: ```#{error_string}```", http_status_code: "500")
+            else
+              inform_error("Unhandled error while #{title}: #{output.backquote(error_string)}", http_status_code: "500")
+            end
+            error($!.backtrace.join("\n"))
           end
           debug("Completed #{title} in #{format_duration(end_time - start_time)}")
+          output.finished
         ensure
           # Even if the act of reporting the error raises, we want to set the
           # command finished (if we can).
@@ -214,7 +278,7 @@ module Lita
 
           debug("Completed `#{command}` with status #{shellout.exitstatus} in #{format_duration(Time.now.utc - command_start_time)}")
           shellout.error!
-          error!("Read thread exception: #{read_thread_exception}\n#{read_thread_exception.backtrace.map { |l| "  #{l}" }}") if read_thread_exception
+          respond_error!("Read thread exception: #{read_thread_exception}\n#{read_thread_exception.backtrace.map { |l| "  #{l}" }}") if read_thread_exception
           shellout
         end
       end
@@ -241,68 +305,32 @@ module Lita
             "INITIATED_BY" => response ? response.user.mention_name : "BumpBot"
           )
         rescue JenkinsHTTP::JenkinsHTTPError => e
-          error("Sorry, received HTTP error when kicking off the build!\n#{e}")
-          return false
+          respond_error!("Sorry, received HTTP error #{output.backquote(e)} kicking off #{pipeline} build of #{git_ref}")
         end
-
-        return true
       end
 
-      #
-      # Optional command arguments if this handler is a command handler.
-      #
-      attr_reader :command_args
+      def self.reset!
+        @@running_handlers = Set.new
+      end
+      reset!
 
-      def error!(message, status: "500")
-        error(message, status: status)
-        raise ErrorAlreadyReported.new(message)
+      def self.running_handlers
+        @@running_handlers
       end
 
-      def error(message, status: "500")
-        if http_response
-          http_response.status = status
-        end
-        send_message("**ERROR:** #{message}")
-        log_each_line(:error, message)
-      end
-
-      def warn(message)
-        send_message("WARN: #{message}")
-        log_each_line(:warn, message)
-      end
-
-      def info(message)
-        send_message(message)
-        log_each_line(:info, message)
-      end
-
-      # debug messages are only sent to users in private messages
-      def debug(message)
-        send_message(message) if response && response.private_message? && config.debug_lines_in_pm
-        log_each_line(:debug, message)
-      end
-
-      def project
-        projects[project_name]
-      end
-
-      def projects
-        config.projects
-      end
-
-      class ErrorAlreadyReported < StandardError
-        attr_accessor :cause
-
-        def initialize(message = nil, cause = nil)
-          super(message)
-          self.cause = cause
-        end
+      def running_handlers
+        @@running_handlers
       end
 
       private
 
       def handle_command(command, response, **arg_options, &block)
-        handle("handling command #{response.message.body.inspect} from #{response.message.source.user.mention_name}#{response.message.source.room ? " in #{response.message.source.room}" : ""}", response: response) do
+        @response = response
+        output.lita_target = lita_target(response)
+        title = "Running `#{response.message.body}` for @#{response.message.source.user.mention_name}"
+# TODO find out how to get the actual channel name instead of the internal ID
+#        title << " in ##{response.message.source.room_object.name}" unless response.private_message?
+        handle(title) do
           redis.hset("handlers:#{handler_id}", "command", command)
           parse_args(command, response, **arg_options)
           redis.hset("handlers:#{handler_id}", "project", project_name) if project_name
@@ -320,16 +348,16 @@ module Lita
         if project_arg
           # Grab the project name and command args
           @project_name = args.shift
-          error!("No project specified!\n#{usage(help)}") unless project_name
+          respond_error!("No project specified!\n#{usage(help)}") unless project_name
           unless project
-            error!("Invalid project #{project_name}. Valid projects: #{projects.keys.join(", ")}.\n#{usage(help)}")
+            respond_error!("Invalid project #{project_name}. Valid projects: #{projects.keys.join(", ")}.\n#{usage(help)}")
           end
         end
 
         @command_args = args
 
         if command_args.size > max_args
-          error!("Too many arguments (#{command_args.size + (project_arg ? 1 : 0)} for #{max_args + (project_arg ? 1 : 0)})!\n#{usage(help)}")
+          respond_error!("Too many arguments (#{command_args.size + (project_arg ? 1 : 0)} for #{max_args + (project_arg ? 1 : 0)})!\n#{usage(help)}")
         end
       end
 
@@ -343,61 +371,8 @@ module Lita
         usage << usage_lines.join("\n")
       end
 
-      attr_accessor :last_log_time
-      attr_accessor :last_log_level
-
-      #
-      # Log to the default Lita logger with a custom per-line prefix.
-      #
-      # This is help identify what command or handler a particular message came
-      # from when reading syslog.
-      #
-      def log_each_line(log_level, message)
-        time = Time.now.utc.to_s
-
-        log_time = time.to_s
-        justified_log_level = log_level.to_s.upcase.ljust(5)
-        log_chunk = message.to_s.lines.map do |line|
-          # After the first line of the output, emit spaces for easier reading
-          if log_time == last_log_time
-            log_time = " " * log_time.size if log_time == last_log_time
-          else
-            self.last_log_time = log_time
-          end
-          if justified_log_level == last_log_level
-            justified_log_level = " " * justified_log_level.size if justified_log_level == last_log_level
-          else
-            self.last_log_level = justified_log_level
-          end
-          "[#{log_time} #{justified_log_level}] #{line.chomp}\n"
-        end.join("")
-        redis.append("handler_logs:#{handler_id}", log_chunk)
-
-        message.to_s.each_line do |l|
-          log.public_send(log_level, "[#{handler_id}] #{l.chomp}")
-        end
-      end
-
-      #
-      # Send a message to the appropriate place.
-      #
-      # - For Slack messages, errors are sent to the originating user via respond
-      # - For events, errors are sent to the project.channel_name
-      #
-      def send_message(message)
-        if response
-          response.reply(message)
-        else
-          room = message_source
-          robot.send_message(room, message) if room
-        end
-        if http_response
-          message = "#{message}\n" unless message.end_with?("\n")
-          http_response.body << message
-        end
-      end
-
-      def message_source
+      def lita_target(response)
+        return response.message.source if response
         if project && project[:inform_channel]
           @project_room = source_by_name(project[:inform_channel]) unless defined?(@project_room)
           @project_room
