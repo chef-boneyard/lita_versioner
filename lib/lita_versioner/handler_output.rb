@@ -1,6 +1,6 @@
 require_relative "error_already_reported"
 require_relative "format_helpers"
-
+require_relative "slack_api"
 module LitaVersioner
   #
   # Handles the rules for output.
@@ -33,6 +33,12 @@ module LitaVersioner
     attr_accessor :lita_target
     attr_accessor :http_response
     attr_accessor :status
+
+    def slack_api
+      if Lita.config.robot.adapter == :slack
+        SlackAPI.new(handler.robot.config)
+      end
+    end
 
     # Let the user know something about the operation.
     def inform(message = nil, http_status_code: nil, **slack_message_arguments)
@@ -225,8 +231,8 @@ module LitaVersioner
       slack_message_arguments[:link_names] = link_names
       slack_message_arguments[:parse] = parse
       if lita_target
-        if Lita.config.robot.adapter == :slack
-          handler.robot.chat_service.send_message(lita_target, message, **slack_message_arguments)
+        if slack_api
+          slack_api.post("chat.postMessage", channel: lita_target, text: message, **slack_message_arguments)
         else
           slack_to_messages(message, **slack_message_arguments).each do |message|
             handler.robot.send_message(lita_target, message)
@@ -304,11 +310,12 @@ module LitaVersioner
       progress_message_mutex.synchronize do
         # Only create the log if we're in progress.
         if status.nil?
-          if lita_target && Lita.config.robot.adapter == :slack
+          if lita_target && slack_api
+            # Remember the id (channel + ts) of the message we create
+            response = slack_api.post("chat.postMessage", channel: lita_target, **progress_message)
             self.last_progress_message_update = Time.now.utc
-            result = handler.robot.chat_service.send_message(lita_target, **progress_message)
-            self.progress_message_channel = result["channel"]
-            self.progress_message_ts = result["ts"]
+            self.progress_message_channel = response["channel"]
+            self.progress_message_ts = response["ts"]
           end
         end
       end
@@ -323,16 +330,16 @@ module LitaVersioner
       progress_message_mutex.synchronize do
         if progress_message_ts
           if status
-            # If we're finished, delete the progress message.
-            handler.robot.chat_service.delete_message(progress_message_channel, progress_message_ts)
-            self.last_progress_message_update = Time.now.utc
+            # If we're finished, delete the progress message. Presumably the
+            # command has emitted a success or failure message.
+            slack_api.post("chat.delete", channel: progress_message_channel, ts: progress_message_ts)
             self.progress_message_channel = nil
             self.progress_message_ts = nil
           else
             # Otherwise, update it.
-            self.last_progress_message_update = Time.now.utc
-            handler.robot.chat_service.update_message(progress_message_channel, progress_message_ts, **progress_message)
+            slack_api.post("chat.update", channel: progress_message_channel, ts: progress_message_ts, **progress_message)
           end
+          self.last_progress_message_update = Time.now.utc
         end
       end
     end

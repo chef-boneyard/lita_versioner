@@ -7,5 +7,5 @@ group(:style) do
 end
 
 group(:slack) do
-  gem "lita-slack", github: "jkeiser/lita-slack", branch: "send-messages-with-arguments"
+  gem "lita-slack"#, github: "jkeiser/lita-slack", branch: "send-messages-with-arguments"
 end
