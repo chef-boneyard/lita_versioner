@@ -52,13 +52,10 @@ module Lita
       def github_handler(request, response)
         output.http_response = response
         # Filter out events and parse the response
-        handle "received github event #{request.params["payload"]}" do
+        handle "received github event" do
           pull_request_url, merge_commit_sha = parse_github_event(request)
           if pull_request_url
-            versioner = Versioner.from_handler(self)
-            versioner.handle "github merged pull request #{pull_request_url} for #{project_name}: #{merge_commit_sha}" do
-              bump_version_and_trigger_build
-            end
+            bump_version_and_trigger_build
           end
         end
       end
@@ -106,7 +103,7 @@ module Lita
           return
         end
 
-        info("'#{pull_request_url}' was just merged. Bumping version and submitting a build ...")
+        info("'#{pull_request_url}' was just merged at #{merge_commit_sha}. Bumping version and submitting a build ...")
 
         [ pull_request_url, merge_commit_sha ]
       end

@@ -73,29 +73,6 @@ module Lita
       end
 
       #
-      # Create a new handler which will send messages and HTTP responses to the
-      # same place as the original.
-      #
-      # Versioner.from_handler(handler) will create a Versioner object;
-      # DependencyUpdater.from_handler(handler) will create a DependencyUpdater
-      # object; etc. etc.
-      #
-      def self.from_handler(handler)
-        result = new(handler.robot)
-        result.inherit_handler(handler)
-        result
-      end
-
-      #
-      # Inherit response and output information from another handler (see `from_handler`)
-      #
-      def inherit_handler(handler)
-        @project_name = handler.project_name
-        @response = handler.response
-        output.inherit_output(handler.output)
-      end
-
-      #
       # Ensure all subclasses are in the Lita versioner namespace so they share config.
       #
       def self.inherited(klass)
@@ -196,7 +173,7 @@ module Lita
         create_sandbox_directory
         debug("Started #{title}")
 
-        # Actually handler the command
+        # Actually handle the command
         instance_eval(&block)
 
         end_time = Time.now.utc
