@@ -168,14 +168,6 @@ module LitaVersioner
       "`#{text.tr("`", "'")}`"
     end
 
-    # Output to the same place as another output object. Used by BumpbotHandler.from_handler
-    def inherit_output(other)
-      raise "Cannot inherit output of an unfinished handler!" if other.send(:progress_message_ts)
-      @lita_target = other.lita_target
-      @http_response = other.http_response
-      @status = other.status
-    end
-
     private
 
     attr_accessor :last_log_time
