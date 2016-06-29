@@ -14,10 +14,8 @@ module Lita
       #
       # Command: update dependencies PROJECT
       #
-      command_route(
-        "update dependencies",
-        "Runs the dependency updater and submits a build if there are new dependencies."
-      ) do
+      desc "Runs the dependency updater and submits a build if there are new dependencies."
+      command_route "update dependencies PROJECT" do
         info("Checking for updated dependencies for #{project_name}...")
         update_dependencies
       end
@@ -25,10 +23,8 @@ module Lita
       #
       # Command: reset dependency updates PROJECT
       #
-      command_route(
-        "reset dependency updates",
-        "Forget failed dependency update builds (fixes 'waiting for the quiet period to expire before building again')."
-      ) do
+      desc "Forget failed dependency update builds (fixes 'waiting for the quiet period to expire before building again')."
+      command_route "reset dependency updates PROJECT" do
         project_repo.delete_branch(DEPENDENCY_BRANCH_NAME)
         respond("Deleted local branch #{DEPENDENCY_BRANCH_NAME} of #{project_name}.")
       end

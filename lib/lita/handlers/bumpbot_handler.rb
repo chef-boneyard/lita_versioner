@@ -12,6 +12,8 @@ require_relative "../../lita_versioner/jenkins_http"
 module Lita
   module Handlers
     class BumpbotHandler < Handler
+      include LitaVersioner::PipelineBot::Handler
+
       # include LitaVersioner so we get the constants from it (so we can use the
       # classes easily here and in subclasses)
       include LitaVersioner
@@ -59,6 +61,10 @@ module Lita
         super
         @handler_id = redis.incr("max_handler_id")
         @output = LitaVersioner::HandlerOutput.new(self)
+      end
+
+      def handler_url(id=handler_id)
+        "#{config.lita_url}/bumpbot/handlers/#{id}/handler.log"
       end
 
       # Get the github web URL to the project (strip .git)
@@ -110,6 +116,18 @@ module Lita
       # Log outputs
       def_delegators :output, :error, :warn, :info, :debug
 
+      def handle_task(description)
+        start_time = Time.now.utc
+        debug(description)
+        begin
+          yield
+          debug("Completed #{description} after #{format_duration(Time.now.utc-start_time)}")
+        rescue
+          error("Failed #{description} after #{format_duration(Time.now.utc-start_time)}: #{$!}")
+          raise
+        end
+      end
+
       #
       # The Project config for the current project
       #
@@ -140,6 +158,16 @@ module Lita
         debug("Cleaned up sandbox directory #{sandbox_directory} after successful command ...")
       end
 
+      def self.current_desc
+        desc = @current_desc
+        @current_desc = nil
+        desc
+      end
+
+      def self.desc(help)
+        @current_desc = desc
+      end
+
       #
       # Define a chat route with the given command name and arguments.
       #
@@ -155,7 +183,7 @@ module Lita
       # @param project_arg [Boolean] Whether the first arg should be PROJECT or not. Default: true
       # @param max_args [Int] Maximum number of extra arguments that this command takes.
       #
-      def self.command_route(command, help, project_arg: true, max_args: 0, &block)
+      def self.command_route(command, help=get_desc, &block)
         help = { "" => help } unless help.is_a?(Hash)
 
         complete_help = {}
@@ -166,9 +194,38 @@ module Lita
             complete_help["#{command} #{arg}".strip] = text
           end
         end
-        route(/^#{command}(\s|$)/, nil, command: true, help: complete_help) do |response|
-          handle_command(command, response, help: complete_help, project_arg: project_arg, max_args: max_args, &block)
+        regexp, max_args = command_regexp(command)
+        route(regexp, nil, command: true, help: complete_help) do |response|
+          handle_command(regexp, response, help: complete_help, &block)
         end
+      end
+
+      #
+      # Create the regexp for the command.
+      #
+      def self.command_regexp(command)
+        parts = command.split(/\s+/)
+        regexp = ""
+        parts.each do |part|
+          prefix << "\\s+" unless regexp == ""
+          case part
+          when /^[A-Z]+$/
+            # UPPERCASE is a var.
+            regexp << "#{prefix}(?<#{part.downcase}>\\S+)"
+          when /^\[([A-Z]+)]$/
+            # [UPPERCASE] is an optional var
+            regexp << "(?:#{prefix}(?<#{$1.downcase}>\\S+))"
+          when /^@USER|#CHANNEL$/
+            # @USER|#CHANNEL = "target" var
+            regexp << "(?:#{prefix}(?<target>@\\S+|#\\S+))"
+          when /^\[@USER|#CHANNEL\]$/
+            # [@USER|#CHANNEL] = optional "target" var
+            regexp << "(?:#{prefix}(?<target>@\\S+|#\\S+))"
+          else
+            regexp << "#{prefix}#{part}"
+          end
+        end
+        Regexp.new("^\s*#{regexp}\s*$")
       end
 
       #
@@ -324,7 +381,7 @@ module Lita
 
       private
 
-      def handle_command(command, response, **arg_options, &block)
+      def handle_command(command, response, &block)
         @response = response
         output.lita_target = lita_target(response)
         title = "Running `#{response.message.body}` for @#{response.message.source.user.mention_name}"
@@ -332,32 +389,15 @@ module Lita
 #        title << " in ##{response.message.source.room_object.name}" unless response.private_message?
         handle(title) do
           redis.hset("handlers:#{handler_id}", "command", command)
-          parse_args(command, response, **arg_options)
+          # Grab the args and the project
+          command_args = response.match_data.captures
+          project_index = response.match_data.index("project")
+          if project_index
+            self.project_name = command_args.delete_at(project_index)
+          end
           redis.hset("handlers:#{handler_id}", "project", project_name) if project_name
           redis.hset("handlers:#{handler_id}", "command_args", Shellwords.join(command_args))
           instance_exec(*command_args, &block)
-        end
-      end
-
-      def parse_args(command, response, help:, project_arg: true, max_args: 0)
-        # Strip extra words from the args: response.args will start with
-        # "dependencies" if the command is "update dependencies"
-        command_words = command.split(/\s+/)
-        args = response.args[command_words.size - 1..-1]
-
-        if project_arg
-          # Grab the project name and command args
-          @project_name = args.shift
-          respond_error!("No project specified!\n#{usage(help)}") unless project_name
-          unless project
-            respond_error!("Invalid project #{project_name}. Valid projects: #{projects.keys.join(", ")}.\n#{usage(help)}")
-          end
-        end
-
-        @command_args = args
-
-        if command_args.size > max_args
-          respond_error!("Too many arguments (#{command_args.size + (project_arg ? 1 : 0)} for #{max_args + (project_arg ? 1 : 0)})!\n#{usage(help)}")
         end
       end
 

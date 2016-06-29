@@ -13,15 +13,8 @@ module Lita
       #
       http.post "/github_handler", :github_handler
 
-      #
-      # Command: build PROJECT [GIT_REF=master]
-      #
-      command_route(
-        "build",
-        { "[GIT_REF]" => "Kicks off a build for PROJECT with GIT_REF. GIT_REF default: master." },
-        max_args: 1
-      ) do |git_ref = "master"|
-
+      desc "Kicks off a build for PROJECT with GIT_REF. GIT_REF default: master."
+      command_route "build PROJECT [GIT_REF]" do |git_ref = "master"|
         if git_ref == "master"
           pipeline = project[:pipeline]
         else
@@ -35,10 +28,8 @@ module Lita
       #
       # Command: bump PROJECT
       #
-      command_route(
-        "bump",
-        "Bumps the version of PROJECT and starts a build."
-      ) do
+      desc "Bumps the version of PROJECT and starts a build."
+      command_route "bump PROJECT" do
         bump_version_and_trigger_build
       end
 

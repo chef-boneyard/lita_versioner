@@ -9,11 +9,8 @@ module Lita
       #
       # Command: bumpbot running handlers
       #
-      command_route(
-        "bumpbot running handlers",
-        "Get the list of running handlers in bumpbot",
-        project_arg: false
-      ) do
+      desc "Get the list of running handlers in bumpbot"
+      command_route "bumpbot running handlers" do
         running_handlers = self.running_handlers.reject { |handler| handler == self }
         if running_handlers.any?
           running_handlers.sort_by! { |handler| [ handler.start_time, handler.handler_id.to_i ] }
@@ -30,12 +27,8 @@ module Lita
       #
       # Command: bumpbot handlers
       #
-      command_route(
-        "bumpbot handlers",
-        { "[RANGE]" => "Get the list of running and failed handlers in bumpbot (corresponds to the list of failed commands). Optional RANGE will get you a list of handlers. Default range is 1-10." },
-        project_arg: false,
-        max_args: 1
-      ) do |range = "1-10"|
+      desc "Get the list of running and failed handlers in bumpbot (corresponds to the list of failed commands). Optional RANGE will get you a list of handlers. Default range is 1-10."
+      command_route "bumpbot handlers [RANGE]" do |range = "1-10"|
         raise "Range must be <start index>-<end index>!" unless range =~ /^(\d+)(-)?(\d*)$/
         raise "Range start cannot be 0 (starts at 1!)" if $1 == "0"
 
@@ -71,7 +64,7 @@ module Lita
               attachment[:color] = "warning"
               status = "in progress"
             end
-            attachment[:text] = "#{title} #{status}. <#{config.lita_url}/bumpbot/handlers/#{handler_id}/handler.log|Log>"
+            attachment[:text] = "#{title} #{status}. <#{handler_url}/handler.log|Log>"
             attachment[:ts] = start_time.to_i
             attachments << attachment
           end

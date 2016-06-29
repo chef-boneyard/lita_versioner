@@ -1,15 +1,23 @@
 # Extracted from lita-slack plugin
 
+require_relative "slack_api/message"
+
 module LitaVersioner
   class SlackAPI
+    attr_reader :log
     attr_reader :config
 
-    def initialize(config)
+    def initialize(log, config)
+      @log = log
       @config = config
     end
 
     def connection
       Faraday.new
+    end
+
+    def message(log, channel, ts)
+      Message.new(log, channel, ts)
     end
 
     #
@@ -49,6 +57,8 @@ module LitaVersioner
           end
       end
 
+      log.info("POST https://slack.com/api/#{method}")
+      debug("    Arguments: #{arguments}")
       response = connection.post(
         "https://slack.com/api/#{method}",
         token: config.adapters.slack.token,
@@ -56,15 +66,19 @@ module LitaVersioner
       )
 
       unless response.success?
+        log.error("Bad HTTP status code from POST https://slack.com/api/#{method}: #{response.status}")
         raise "Slack API call to #{method} failed with status code #{response.status}: '#{response.body}'. Headers: #{response.headers}. Arguments: #{arguments}"
       end
 
       data = JSON.parse(response.body)
 
       if data["error"]
+        log.error("Slack error from POST https://slack.com/api/#{method}: #{data["error"]}")
         raise "Slack API call to #{method} returned an error: #{data["error"]}. Arguments: #{arguments}"
       end
 
+      log.info("Success from POST https://slack.com/api/#{method}: #{response.status}.")
+      debug("     Data: #{data}")
       data
     end
   end
