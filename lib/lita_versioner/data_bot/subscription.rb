@@ -86,11 +86,7 @@ module LitaVersioner
       end
 
       def slack_message
-        {
-          attachments: [{
-            "#{target} is subscribed to #{filter} with options #{options}"
-          }]
-        }
+        "#{target} is subscribed to #{filter} with options #{options}"
       end
 
       def send_event(event)

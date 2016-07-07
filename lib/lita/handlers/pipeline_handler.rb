@@ -6,6 +6,10 @@ module Lita
 
       Bot = PipelineBot::Bot
 
+      on :loaded do
+        Bot.start(handler)
+      end
+
       # Overall Status
       desc "Get pipeline bot status"
       Bot.command "pipeline status" do
@@ -20,7 +24,7 @@ module Lita
       # Subscriptions
       desc "List all pipeline subscriptions"
       Bot.command "pipeline subscriptions" do
-        bot.subscriptions
+        bot.subscriptions.values
       end
       desc "Show subscription. #{TARGET_HELP}"
       Bot.command "pipeline subscription show [@USER|#CHANNEL]" do |target|
@@ -64,11 +68,11 @@ module Lita
       end
       desc "Start tracking the given Jenkins server. #{SERVER_HELP}"
       Bot.command "pipeline add jenkins server SERVER" do |server|
-        bot.add_server(server)
+        bot.add_jenkins_server(server)
       end
       desc "Stop tracking the given Jenkins server. #{SERVER_HELP}"
       Bot.command "pipeline remove jenkins server SERVER" do |server|
-        bot.remove_server(server)
+        bot.remove_jenkins_server(server)
       end
       desc "Show refresh status for the given Jenkins server. #{SERVER_HELP}"
       Bot.command "pipeline show jenkins server SERVER" do |server|
@@ -78,7 +82,7 @@ module Lita
       # Pipelines
       desc "List all Jenkins pipelines."
       Bot.command "pipeline list jenkins pipelines" do
-        bot.jenkins_server.flat_map { |s| s.pipelines }
+        bot.jenkins_servers.flat_map { |s| s.pipelines }
       end
       desc "List pipelines on the given Jenkins server. #{SERVER_HELP}"
       Bot.command "pipeline list jenkins pipelines for SERVER" do |server|

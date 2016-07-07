@@ -12,8 +12,6 @@ require_relative "../../lita_versioner/jenkins_http"
 module Lita
   module Handlers
     class BumpbotHandler < Handler
-      include LitaVersioner::PipelineBot::Handler
-
       # include LitaVersioner so we get the constants from it (so we can use the
       # classes easily here and in subclasses)
       include LitaVersioner
@@ -63,7 +61,7 @@ module Lita
         @output = LitaVersioner::HandlerOutput.new(self)
       end
 
-      def handler_url(id=handler_id)
+      def handler_log_url(id=handler_id)
         "#{config.lita_url}/bumpbot/handlers/#{id}/handler.log"
       end
 
@@ -158,14 +156,14 @@ module Lita
         debug("Cleaned up sandbox directory #{sandbox_directory} after successful command ...")
       end
 
-      def self.current_desc
-        desc = @current_desc
-        @current_desc = nil
+      def self.get_desc
+        desc = @desc
+        @desc = nil
         desc
       end
 
-      def self.desc(help)
-        @current_desc = desc
+      def self.desc(desc)
+        @desc = desc
       end
 
       #
@@ -180,52 +178,18 @@ module Lita
       #     'EXTRA_ARG_NAME' => 'some usage',
       #     'DIFFERENT_ARG SEQUENCE HERE' => 'different usage'
       #   }
-      # @param project_arg [Boolean] Whether the first arg should be PROJECT or not. Default: true
-      # @param max_args [Int] Maximum number of extra arguments that this command takes.
       #
       def self.command_route(command, help=get_desc, &block)
         help = { "" => help } unless help.is_a?(Hash)
 
         complete_help = {}
         help.each do |arg, text|
-          if project_arg
-            complete_help["#{command} PROJECT #{arg}".strip] = text
-          else
-            complete_help["#{command} #{arg}".strip] = text
-          end
+          complete_help["#{command} #{arg}".strip] = text
         end
-        regexp, max_args = command_regexp(command)
+        regexp = command_regexp(command)
         route(regexp, nil, command: true, help: complete_help) do |response|
-          handle_command(regexp, response, help: complete_help, &block)
+          handle_command(command, response, regexp: regexp, help: complete_help, &block)
         end
-      end
-
-      #
-      # Create the regexp for the command.
-      #
-      def self.command_regexp(command)
-        parts = command.split(/\s+/)
-        regexp = ""
-        parts.each do |part|
-          prefix << "\\s+" unless regexp == ""
-          case part
-          when /^[A-Z]+$/
-            # UPPERCASE is a var.
-            regexp << "#{prefix}(?<#{part.downcase}>\\S+)"
-          when /^\[([A-Z]+)]$/
-            # [UPPERCASE] is an optional var
-            regexp << "(?:#{prefix}(?<#{$1.downcase}>\\S+))"
-          when /^@USER|#CHANNEL$/
-            # @USER|#CHANNEL = "target" var
-            regexp << "(?:#{prefix}(?<target>@\\S+|#\\S+))"
-          when /^\[@USER|#CHANNEL\]$/
-            # [@USER|#CHANNEL] = optional "target" var
-            regexp << "(?:#{prefix}(?<target>@\\S+|#\\S+))"
-          else
-            regexp << "#{prefix}#{part}"
-          end
-        end
-        Regexp.new("^\s*#{regexp}\s*$")
       end
 
       #
@@ -381,20 +345,52 @@ module Lita
 
       private
 
-      def handle_command(command, response, &block)
+      #
+      # Create the regexp for the command.
+      #
+      def self.command_regexp(command)
+        parts = command.split(/\s+/)
+        regexp = ""
+        parts.each do |part|
+          prefix = "\\s+" unless regexp == ""
+          case part
+          when /^[A-Z_]+$/
+            # UPPERCASE is a var.
+            regexp << "#{prefix}(?<#{part.downcase}>\\S+)"
+          when /^\[([A-Z_]+)\]$/
+            # [UPPERCASE] is an optional var
+            regexp << "(?:#{prefix}(?<#{$1.downcase}>\\S+))?"
+          when /^@USER|#CHANNEL$/
+            # @USER|#CHANNEL = "target" var
+            regexp << "#{prefix}(?<target>@\\S+|#\\S+)"
+          when /^\[@USER|#CHANNEL\]$/
+            # [@USER|#CHANNEL] = optional "target" var
+            regexp << "(?:#{prefix}(?<target>@\\S+|#\\S+))?"
+          else
+            regexp << "#{prefix}#{part}"
+          end
+        end
+        Regexp.new("^\s*#{regexp}\s*$")
+      end
+
+      def handle_command(command, response, regexp: nil, help: nil, &block)
         @response = response
         output.lita_target = lita_target(response)
         title = "Running `#{response.message.body}` for @#{response.message.source.user.mention_name}"
-# TODO find out how to get the actual channel name instead of the internal ID
-#        title << " in ##{response.message.source.room_object.name}" unless response.private_message?
+        # TODO find out how to get the actual channel name instead of the internal ID
+        # title << " in ##{response.message.source.room_object.name}" unless response.private_message?
         handle(title) do
           redis.hset("handlers:#{handler_id}", "command", command)
           # Grab the args and the project
           command_args = response.match_data.captures
-          project_index = response.match_data.index("project")
+          project_index = Array(regexp.named_captures["project"]).first
           if project_index
-            self.project_name = command_args.delete_at(project_index)
+            self.project_name = command_args.delete_at(project_index-1)
+            if project_name && !projects.has_key?(project_name)
+              respond_error!("Invalid project #{project_name}. Valid projects: #{projects.keys.join(", ")}.\n#{usage(help)}")
+            end
           end
+          command_args.compact!
           redis.hset("handlers:#{handler_id}", "project", project_name) if project_name
           redis.hset("handlers:#{handler_id}", "command_args", Shellwords.join(command_args))
           instance_exec(*command_args, &block)

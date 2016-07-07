@@ -42,26 +42,6 @@ describe Lita::Handlers::BumpbotStatusHandler, lita_handler: true, additional_li
   with_jenkins_server "http://manhattan.ci.chef.co"
 
   context "bumpbot handlers" do
-    it "bumpbot running handlers with arguments emits a reasonable error message" do
-      send_command("bumpbot running handlers blarghle")
-
-      expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
-        Too many arguments (1 for 0)!
-        Usage: bumpbot running handlers   - Get the list of running handlers in bumpbot
-        Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
-      EOM
-    end
-
-    it "bumpbot handlers with more than one argument emits a reasonable error message" do
-      send_command("bumpbot handlers 1-2 blarghle")
-
-      expect(one_second_slop(reply_string)).to eq(strip_eom_block(<<-EOM))
-        Too many arguments (2 for 1)!
-        Usage: bumpbot handlers [RANGE]   - Get the list of running and failed handlers in bumpbot (corresponds to the list of failed commands). Optional RANGE will get you a list of handlers. Default range is 1-10.
-        Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
-      EOM
-    end
-
     context "when there are no running handlers" do
       it "bumpbot running handlers reports no handlers" do
         send_command("bumpbot running handlers")

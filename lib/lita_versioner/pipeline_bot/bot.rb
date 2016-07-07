@@ -9,6 +9,17 @@ module LitaVersioner
   module PipelineBot
     class Bot < DataBot::Bot
       #
+      # Start this bot.
+      #
+      # @param handler [Lita::Handler] The Lita handler doing the starting.
+      #
+      def self.start(handler)
+        Bot.with(handler) do
+          bot.jenkins_listener.start
+        end
+      end
+
+      #
       # The list of tracked Jenkins serverss.
       #
       # @return [Array<JenkinsServer>] The list of Jenkins servers.
@@ -87,7 +98,7 @@ module LitaVersioner
       def slack_message
         attachment = {}
         attachment[:color] = jenkins_listener.working_properly? ? "good" : "danger"
-        attachment[:text] << "Jenkins listener #{jenkins_listener.status} (<#{handler_url(jenkins_listener.last_handler_id)}/handler.log|last attempt>}). <#{config.lita_url}|Web interface>"
+        attachment[:text] << "Jenkins listener #{jenkins_listener.status} (<#{handler_log_url(jenkins_listener.last_handler_id)}|last attempt>}). <#{config.lita_url}|Web interface>"
         { attachments: [ attachment ] }
       end
     end

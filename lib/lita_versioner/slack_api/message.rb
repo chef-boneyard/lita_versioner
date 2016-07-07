@@ -24,6 +24,5 @@ module LitaVersioner
         bot.slack_api.post("chat.delete", channel: channel, ts: ts)
       end
     end
-    end
   end
 end

@@ -53,10 +53,10 @@ module LitaVersioner
 
       def slack_message
         if last_run
-          last_run_text = " Last run: <#{handler_url(last_run_id)}|#{format_duration(Time.last_run)} ago>"
+          last_run_text = " Last run: <#{handler_log_url(last_run_id)}|#{format_duration(Time.last_run)} ago>"
         end
         if current_run
-          current_run_text = " Current run: started <#{handler_url(last_run_id)}|#{format_duration(Time.now.utc-current_run)} ago>"
+          current_run_text = " Current run: started <#{handler_log_url(last_run_id)}|#{format_duration(Time.now.utc-current_run)} ago>"
         end
 
         {

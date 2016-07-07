@@ -1,4 +1,5 @@
 require "json"
+require_relative "../format_helpers"
 
 module LitaVersioner
   module DataBot
@@ -6,6 +7,8 @@ module LitaVersioner
     # Base class for Data. Can be loaded or saved. Can fire events.
     #
     class Data
+      include FormatHelpers
+
       #
       # The bot this data is a part of.
       #
@@ -67,7 +70,7 @@ module LitaVersioner
       end
 
       extend Forwardable
-      def_delegators :handler, :error, :warn, :info, :debug, :log_task, handler_url
+      def_delegators :handler, :error, :warn, :info, :debug, :log_task, handler_log_url
 
       protected
 

@@ -47,7 +47,8 @@ end
 module Lita
   module Handlers
     class TestWaitHandler < BumpbotHandler
-      command_route "test wait", "Waits until signalled.", max_args: 1, project_arg: false do |failure|
+      desc "Waits until signalled."
+      command_route "test wait [FAILURE]" do |failure|
         wait_for.wait(mutex)
         respond_error!(failure) if failure
       end
@@ -69,7 +70,8 @@ module Lita
     end
 
     class TestCommandHandler < BumpbotHandler
-      command_route "test command", "Runs through, or fails if given a message to fail with.", max_args: 1, project_arg: false do |failure|
+      desc "Runs through, or fails if given a message to fail with."
+      command_route "test command [FAILURE]" do |failure|
         respond_error!(failure) if failure
       end
     end

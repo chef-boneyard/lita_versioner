@@ -36,30 +36,10 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
 
   context "build" do
 
-    it "build with no arguments emits a reasonable error message" do
-      send_command("build")
-
-      expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
-        No project specified!
-        Usage: build PROJECT [GIT_REF]   - Kicks off a build for PROJECT with GIT_REF. GIT_REF default: master.
-        Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
-      EOM
-    end
-
     it "build blarghle emits a reasonable error message" do
       send_command("build blarghle")
       expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
         Invalid project blarghle. Valid projects: lita-test.
-        Usage: build PROJECT [GIT_REF]   - Kicks off a build for PROJECT with GIT_REF. GIT_REF default: master.
-        Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
-      EOM
-    end
-
-    it "build lita-test master blarghle does not build (too many arguments)" do
-      send_command("build lita-test master blarghle")
-
-      expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
-        Too many arguments (3 for 2)!
         Usage: build PROJECT [GIT_REF]   - Kicks off a build for PROJECT with GIT_REF. GIT_REF default: master.
         Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
       EOM
@@ -87,31 +67,11 @@ describe Lita::Handlers::Versioner, lita_handler: true, additional_lita_handlers
   end
 
   context "bump" do
-    it "build with no arguments emits a reasonable error message" do
-      send_command("bump")
-
-      expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
-        No project specified!
-        Usage: bump PROJECT   - Bumps the version of PROJECT and starts a build.
-        Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
-      EOM
-    end
-
     it "build blarghle emits a reasonable error message" do
       send_command("bump blarghle")
 
       expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
         Invalid project blarghle. Valid projects: lita-test.
-        Usage: bump PROJECT   - Bumps the version of PROJECT and starts a build.
-        Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
-      EOM
-    end
-
-    it "bump lita-test blarghle does not bump (too many arguments)" do
-      send_command("bump lita-test blarghle")
-
-      expect(strip_log_data(reply_string)).to eq(strip_eom_block(<<-EOM))
-        Too many arguments (2 for 1)!
         Usage: bump PROJECT   - Bumps the version of PROJECT and starts a build.
         Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
       EOM

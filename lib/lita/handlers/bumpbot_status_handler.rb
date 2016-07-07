@@ -64,7 +64,7 @@ module Lita
               attachment[:color] = "warning"
               status = "in progress"
             end
-            attachment[:text] = "#{title} #{status}. <#{handler_url}/handler.log|Log>"
+            attachment[:text] = "#{title} #{status}. <#{handler_log_url(handler_id)}|Log>"
             attachment[:ts] = start_time.to_i
             attachments << attachment
           end

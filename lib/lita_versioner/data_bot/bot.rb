@@ -34,6 +34,33 @@ module LitaVersioner
       end
 
       #
+      # Get the emoji to use instead of a color when transforming a series of
+      # attachments into a list.
+      #
+      # By default, "good" = `:white_check_mark:`, "warning" = `:grey_question`
+      # and "danger" = `:x:`. Everything else is `:white_small_square` by default.
+      #
+      # @param color [String] The attachment color.
+      #
+      # @return [String] The emoji for the given color.
+      #
+      def list_emoji(color)
+        emoji = (data["list_emoji"] && data["list_emoji"][color]
+        emoji || begin
+          case color
+          when "good"
+            ":white_check_mark:"
+          when "warning"
+            ":grey_question:"
+          when "danger"
+            ":x"
+          else
+            ":white_small_square:"
+          end
+        end
+      end
+
+      #
       # Bot configuration.
       #
       # @param [Lita::Config] The Lita config.
@@ -100,7 +127,60 @@ module LitaVersioner
       # @param message [Hash] The message to send.
       #
       def send_slack_message(target, message)
-        slack_api.post("chat.postMessage", channel: target, link_names: 1, parse: "none", message: message)
+        message = to_slack_message(message)
+        if message
+          slack_api.post("chat.postMessage",
+            channel: target,
+            link_names: 1,
+            parse: "none",
+            mrkdwn_in: %w{text pretext fields},
+            **message)
+          end
+        end
+      end
+
+      #
+      # Transforms the result of `slack_message` to arguments that can be sent to Slack.
+      #
+      # Strings are transformed into colorless attachments.
+      #
+      # Data will have `slack_message` called on them and then transformed.
+      #
+      # Arrays yield a single attachment in list form so that "more ..." will
+      # work. Colors are transformed into emojis via `list_emoji`.
+      #
+      # Hashes are passed through verbatim.
+      #
+      # @param message [String,Hash,nil,Array,Data] The message to transform.
+      # @return [Hash,nil] The resulting message.
+      #
+      def to_slack_message(message)
+        case message
+        when String
+          {
+            attachments: [{ text: slack_message }]
+          }
+        when Hash,nil
+          message
+        when Array
+          # Transform array of text into a text list to allow "More..." to work.
+          items = []
+          message.each do |item|
+            item = to_slack_message(item)
+            next if item.nil?
+            raise "Cannot turn #{item} into a list item: must have only attachments." if item.keys == [ :attachments ]
+            item[:attachments].each do |attachment|
+              raise "Cannot turn #{attachment} into a list item: must have only color and text keys" if (item.keys - [ :color, :text ]).any?
+              items << "#{list_emoji(item[:color])} #{item[:text]}"
+            end
+          end
+          return nil if items.empty?
+          { attachments: [{ text: items.join("\n") }]}
+        when Data
+          to_slack_message(data.slack_message)
+        else
+          message
+        end
       end
 
       #
@@ -113,59 +193,20 @@ module LitaVersioner
             # Run the command and get results
             results = bot.instance_exec(*args, &block)
 
-            # Put together the Slack message for each result
-            attachments = []
-            Array(results).each do |result|
-              message = result.slack_message
-              next unless message
-              raise "Message #{message} must only have attachments!" if (message.keys - [ :attachments ]).any?
-              if message[:attachments]
-                attachments += message[:attachments]
-              end
-            end
+            message = to_slack_message(results.slack_message)
 
             # Send the Slack response
-            handler.respond(attachments: attachments) if attachments.any?
+            if message
+              handler.respond(
+                link_names: 1,
+                parse: "none",
+                mrkdwn_in: %w{text pretext fields},
+                **message
+              )
+            end
           end
         end
       end
-
-      #
-      # Parses the command string.
-      #
-      def self.parse_command()
-
-      #
-      # Define a chat route with the given command name and arguments.
-      #
-      # A bumpbot chat command generally looks like @julia command project *args
-      #
-      # @param command [String] name of the command, e.g. 'build'.
-      # @param method_sym [Symbol] method to dispatch to.  No arguments are passed.
-      # @param help [Hash : String -> String] usage help strings, e.g.
-      #   {
-      #     'EXTRA_ARG_NAME' => 'some usage',
-      #     'DIFFERENT_ARG SEQUENCE HERE' => 'different usage'
-      #   }
-      # @param project_arg [Boolean] Whether the first arg should be PROJECT or not. Default: true
-      # @param max_args [Int] Maximum number of extra arguments that this command takes.
-      #
-      def self.command_route(command, help, project_arg: true, max_args: 0, &block)
-        help = { "" => help } unless help.is_a?(Hash)
-
-        complete_help = {}
-        help.each do |arg, text|
-          if project_arg
-            complete_help["#{command} PROJECT #{arg}".strip] = text
-          else
-            complete_help["#{command} #{arg}".strip] = text
-          end
-        end
-        route(/^#{command}(\s|$)/, nil, command: true, help: complete_help) do |response|
-          handle_command(command, response, help: complete_help, project_arg: project_arg, max_args: max_args, &block)
-        end
-      end
-
 
       protected
 

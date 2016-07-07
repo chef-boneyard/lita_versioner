@@ -24,31 +24,11 @@ describe Lita::Handlers::DependencyUpdater, lita_handler: true, additional_lita_
     # Bad arguments
     #
     context "bad arguments" do
-      it "update dependencies with no arguments emits a reasonable error message" do
-        send_command("update dependencies")
-
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
-          No project specified!
-          Usage: update dependencies PROJECT   - Runs the dependency updater and submits a build if there are new dependencies.
-          Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
-        EOM
-      end
-
       it "update dependencies blarghle emits a reasonable error message" do
         send_command("update dependencies blarghle")
 
         expect(reply_string).to eq(strip_eom_block(<<-EOM))
           Invalid project blarghle. Valid projects: lita-test.
-          Usage: update dependencies PROJECT   - Runs the dependency updater and submits a build if there are new dependencies.
-          Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
-        EOM
-      end
-
-      it "update dependencies lita-test blarghle does not update (too many arguments)" do
-        send_command("update dependencies lita-test blarghle")
-
-        expect(reply_string).to eq(strip_eom_block(<<-EOM))
-          Too many arguments (2 for 1)!
           Usage: update dependencies PROJECT   - Runs the dependency updater and submits a build if there are new dependencies.
           Failed. <http://localhost:8080/bumpbot/handlers/1/handler.log|Full log available here.>
         EOM

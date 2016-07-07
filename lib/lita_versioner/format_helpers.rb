@@ -38,5 +38,9 @@ module LitaVersioner
         "#{parts[0..-2].join(", ")} and #{parts[-1]}"
       end
     end
+
+    def format_datetime(datetime)
+      datetime.to_s
+    end
   end
 end

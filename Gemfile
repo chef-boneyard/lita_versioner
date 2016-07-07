@@ -9,3 +9,5 @@ end
 group(:slack) do
   gem "lita-slack"#, github: "jkeiser/lita-slack", branch: "send-messages-with-arguments"
 end
+
+gem "jenkins_pipeline_report", github: "chef/jenkins_pipeline_report"

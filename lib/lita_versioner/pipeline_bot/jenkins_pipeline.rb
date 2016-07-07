@@ -107,8 +107,9 @@ module LitaVersioner
           prefix = "#{name} is #{data["result"] == "SUCCESS" : "green" : "red"}"
         end
 
-        slack_message = last_build.slack_message
-        slack_message[:attachments][:text] = "#{prefix}: #{slack_message[:attachments][:text]}"
+        slack_message = bot.to_slack_message(last_build)
+        attachment = slack_message[:attachments].first
+        attachment[:text] = "#{prefix}: #{attachment[:text]}"
         slack_message
       end
     end

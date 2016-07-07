@@ -98,17 +98,17 @@ module LitaVersioner
         case report["result"]
         when "SUCCESS"
           {
-            attachments: {
+            attachments: [{
               text: "#{change_identifier} build <#{jenkins_url}|succeeded> in #{report["duration"]}.",
               color: "good"
-            }
+            }]
           }
         when "IN PROGRESS"
           {
-            attachments: {
+            attachments: [{
               text: "#{change_identifier} build running: currently in <#{jenkins_url}|#{stage_name}>.",
               color: "warning"
-            }
+            }]
           }
         else
           run_name, last_run = last_stage["runs"] && last_stage["runs"].last
@@ -116,10 +116,10 @@ module LitaVersioner
             run_text = " <#{last_run["url"]}|#{run_name} log>"
           end
           {
-            attachments: {
+            attachments: [{
               text: "#{change_identifier} pipeline #{report["result"].downcase} due to <#{jenkins_url}|#{report["failure_cause"]}>.#{run_text}",
               color: "danger"
-            }
+            }]
           }
         end
       end

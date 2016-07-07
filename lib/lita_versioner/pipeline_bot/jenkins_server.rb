@@ -110,7 +110,7 @@ module LitaVersioner
           {
             color: "danger",
             attachments: [{
-              "Jenkins <#{url}|#{URI(url).server}> tried and failed to refresh (<#{handler_url(last_refresh_handler_id)}|Log>) at #{format_ago(last_refresh)}. It has #{pipelines.size} pipelines and #{in_progress_builds.size} in-progress builds." :
+              "Jenkins <#{url}|#{URI(url).server}> tried and failed to refresh (<#{handler_log_url(last_refresh_handler_id)}|Log>) at #{format_ago(last_refresh)}. It has #{pipelines.size} pipelines and #{in_progress_builds.size} in-progress builds." :
             }]
           }
         elsif last_refresh
